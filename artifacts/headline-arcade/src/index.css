@@ -161,30 +161,82 @@
   }
 }
 
-/* Custom Neon / Arcade animations */
-
-@keyframes pulse-neon {
-  0% { box-shadow: 0 0 5px hsl(166 100% 48% / 0.5), 0 0 10px hsl(166 100% 48% / 0.5); }
-  50% { box-shadow: 0 0 10px hsl(166 100% 48%), 0 0 20px hsl(166 100% 48%); }
-  100% { box-shadow: 0 0 5px hsl(166 100% 48% / 0.5), 0 0 10px hsl(166 100% 48% / 0.5); }
+/* ── Neon sign frame ── */
+.neon-sign-frame {
+  background: #060a0f;
+  border: 3px solid #00f7c0;
+  box-shadow:
+    0 0 0 1px #00f7c055,
+    0 0 16px 2px #00f7c066,
+    0 0 40px 4px #00f7c033,
+    inset 0 0 20px 2px #00f7c011;
 }
 
-.neon-glow-btn {
-  animation: pulse-neon 2s infinite;
+/* ── Neon text glow ── */
+.neon-text {
+  color: #00f7c0;
+  text-shadow:
+    0 0 6px #00f7c0,
+    0 0 14px #00f7c0,
+    0 0 30px #00f7c099,
+    0 0 60px #00f7c055;
+  animation: neon-flicker 6s infinite;
 }
 
+@keyframes neon-flicker {
+  0%, 90%, 100% {
+    text-shadow:
+      0 0 6px #00f7c0,
+      0 0 14px #00f7c0,
+      0 0 30px #00f7c099,
+      0 0 60px #00f7c055;
+    opacity: 1;
+  }
+  91% { opacity: 0.92; }
+  92% { opacity: 1; }
+  94% { opacity: 0.88; }
+  96% { opacity: 1; }
+}
+
+/* ── Marquee dots ── */
+@keyframes marquee-blink {
+  0%, 49%  { background-color: #ff8c00; box-shadow: 0 0 6px #ff8c00, 0 0 12px #ff8c0088; }
+  50%, 100% { background-color: #5a3800; box-shadow: none; }
+}
+
+.marquee-dot {
+  animation: marquee-blink 1.2s infinite;
+}
+
+/* ── Nav scroll shadow ── */
+.nav-scrolled {
+  box-shadow: 0 2px 20px rgba(0, 247, 192, 0.12);
+}
+
+/* ── PLAY button glow ── */
+@keyframes play-glow {
+  0%, 100% { box-shadow: 0 0 8px #00f7c066, 0 0 16px #00f7c033; }
+  50%       { box-shadow: 0 0 14px #00f7c0aa, 0 0 28px #00f7c055; }
+}
+
+.play-btn-glow {
+  animation: play-glow 2.4s ease-in-out infinite;
+}
+
+/* ── Glitch on arcade sign text ── */
 @keyframes glitch {
-  0% { text-shadow: 2px 0 hsl(166 100% 48%), -2px 0 hsl(340 100% 60%); transform: translate(0); }
-  2% { text-shadow: -2px 0 hsl(166 100% 48%), 2px 0 hsl(340 100% 60%); transform: translate(-2px, 1px); }
-  4% { text-shadow: 2px 0 hsl(166 100% 48%), -2px 0 hsl(340 100% 60%); transform: translate(2px, -1px); }
-  6% { text-shadow: none; transform: translate(0); }
-  100% { text-shadow: none; transform: translate(0); }
+  0%   { text-shadow: 0 0 6px #00f7c0, 0 0 14px #00f7c0, 0 0 30px #00f7c099; transform: translate(0); }
+  1%   { transform: translate(-2px, 1px); }
+  2%   { transform: translate(2px, -1px); filter: hue-rotate(30deg); }
+  3%   { transform: translate(0); filter: none; }
+  100% { transform: translate(0); }
 }
 
 .glitch-text {
-  animation: glitch 4s infinite;
+  animation: glitch 5s infinite;
 }
 
+/* ── Scanlines ── */
 .scanlines {
   position: relative;
 }
@@ -192,10 +244,21 @@
   content: "";
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+  background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.18) 50%, rgba(0,0,0,0.18));
   background-size: 100% 4px;
   pointer-events: none;
   z-index: 10;
+}
+
+/* ── Legacy pulse (keep for game page) ── */
+@keyframes pulse-neon {
+  0%   { box-shadow: 0 0 5px hsl(166 100% 48% / 0.5), 0 0 10px hsl(166 100% 48% / 0.5); }
+  50%  { box-shadow: 0 0 10px hsl(166 100% 48%), 0 0 20px hsl(166 100% 48%); }
+  100% { box-shadow: 0 0 5px hsl(166 100% 48% / 0.5), 0 0 10px hsl(166 100% 48% / 0.5); }
+}
+
+.neon-glow-btn {
+  animation: pulse-neon 2s infinite;
 }
 
 @layer utilities {
