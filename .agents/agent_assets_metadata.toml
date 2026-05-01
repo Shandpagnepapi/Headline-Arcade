@@ -1,0 +1,26 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "N-QkmhYZL2k5ePJcdPuK0"
+uri = "file://artifacts/headline-arcade/public/thumbs/ww11.png"
+type = "image"
+title = "world war 11 game thumb"
+
+[[generated]]
+id = "W-gEgW7cnzrf3KX9VMx0m"
+uri = "file://artifacts/headline-arcade/public/thumbs/jpcannons.png"
+type = "image"
+title = "jp morgan cannons game thumb"
+
+[[generated]]
+id = "XyyjazFeMVLx0jZF_oilH"
+uri = "file://artifacts/headline-arcade/public/thumbs/soon1.png"
+type = "image"
+title = "coming soon slot 1"
+
+[[generated]]
+id = "vPMOYjY7i9bcNUz-_Z018"
+uri = "file://artifacts/headline-arcade/public/thumbs/aliensoon.png"
+type = "image"
+title = "alien files coming soon"
