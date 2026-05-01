@@ -1,0 +1,35 @@
+You are an expert full-stack frontend developer specializing in beautiful, minimalist, dark-mode gaming websites. Build a complete, ready-to-run website called "Headline Arcade" using only HTML, CSS, and vanilla JavaScript. No frameworks, no external libraries except Google Fonts if needed.
+
+OVERALL STYLE (match the premium neon mockups exactly):
+- Deep dark background: #0a0a0a
+- Vibrant neon cyan-green accents: #00f7c0 (bright, glowing, energetic — exactly like the cyan glow in the latest mockups)
+- Clean, modern, addictive Miniclip-style but much more premium and dark
+- Fully responsive: perfect on desktop browsers (wide grid) AND iPhone/mobile (stacked cards, extra-large touch targets)
+- Fast loading, no bloat, silky smooth
+
+KEY VISUAL ELEMENTS TO REPLICATE:
+- Top of the page: a stunning custom graphical header banner (not plain text). Create a wide neon arcade marquee sign using CSS with bright cyan glow, subtle glitch effect, floating newspaper headline icons, tiny game controller/joystick icons, and electric spark details. Center bold futuristic text "HEADLINE ARCADE" inside the marquee with strong neon glow. Background of the banner should have faint newspaper texture and energy lines.
+- Sticky navigation bar right under the banner: logo on left, links "Home | Games | Donate" on right (simple, clean, stays fixed on scroll with slight shadow).
+- Hero section: huge centered white title "HEADLINE ARCADE" + bright neon cyan tagline "Today's wild headlines → silly 60-second games". Small subtitle: "Instant fun. Zero stress. Updated for whatever's happening."
+- Main content: "Today's Games" heading. Clean responsive grid — 4 cards on desktop (2x2), stacked on mobile.
+- Each game card (dark rounded card with subtle neon border glow):
+  - High-quality vibrant thumbnail at top (use placeholder URLs like https://picsum.photos/id/1015/600/400 for now — one card must be themed "World War 11" with a cartoon airplane dodging numbered clouds)
+  - Bold white game title
+  - One short fun silly description
+  - Massive full-width neon cyan "PLAY" button (big text, high contrast, easy to tap on phones)
+- Bottom donation section: "Keep the Arcade Running" heading + fun text "Every coffee = one more headline turned into a silly game ❤️" + bright neon buttons for Ko-fi, PayPal, and Buy Me a Coffee (use placeholder links for now).
+
+JavaScript requirements:
+- Sticky header with smooth scroll shadow
+- Play buttons navigate to /games/game1/index.html etc. (relative links — create placeholder folders)
+- Simple share button in hero that copies a fun message to clipboard
+
+FILE STRUCTURE (create these exact files/folders in Replit):
+1. index.html (the homepage)
+2. style.css
+3. script.js
+4. games/ folder containing game1/, game2/, game3/ (each with a placeholder index.html that just says "Game coming soon — World War 11" etc.)
+
+Output the FULL code for index.html, style.css, and script.js in separate ```html, ```css, ```js blocks. Also provide exact step-by-step instructions for setting up the Replit project so it runs perfectly on first try.
+
+Theme: pure silly, light-hearted, fun distraction site. Zero politics, zero negativity — just addictive 60-second games based on wild current headlines. Make it look premium, viral, and exactly like the neon arcade mockups with the custom marquee header.
