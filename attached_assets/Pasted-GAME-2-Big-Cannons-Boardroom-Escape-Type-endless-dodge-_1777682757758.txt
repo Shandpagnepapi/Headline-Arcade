@@ -1,0 +1,80 @@
+GAME 2: Big Cannons: Boardroom Escape
+Type: endless dodge game with Wall Street boardroom chaos
+
+Important context:
+- This game is inspired by a viral, disputed JPMorgan-style finance meme/story involving an absurd "big cannons" line.
+- Do NOT use real names, real photos, JPMorgan logos, or specific real employee likenesses.
+- Treat everything as fictional parody of internet rumor/meme culture.
+- The tone must be silly, exaggerated, and arcade-like, not mean, explicit, or accusatory.
+- Do not include racial insults, sexual assault details, drugging details, or any serious alleged abuse content.
+- Keep the "big cannons" joke subliminal, cartoony, and absurd.
+
+Character:
+- Player is a tiny nervous finance bro in a suit.
+- Big scared eyes, loose tie, coffee in hand, panicked running animation.
+- Cute cartoon style drawn with Canvas only.
+
+Setting:
+- A neon Wall Street boardroom.
+- Long conference table, glowing stock charts, HR warning signs, compliance folders, and dramatic office lighting.
+- Everything should feel like a fake viral finance scandal exploded into an arcade game.
+
+Main obstacle:
+- Giant bouncing cartoon "CANNONS" with silly boing physics.
+- They should be large round slapstick objects with tiny barrels, wobble animations, and exaggerated bounce.
+- They should visually reference the meme phrase without becoming explicit.
+
+Controls:
+- Left/right arrow keys on desktop.
+- Swipe left/right on mobile.
+- Optional A/D key support.
+
+Gameplay:
+- Player moves along the bottom of the screen.
+- Objects fall from the top or scroll diagonally across the boardroom.
+- Avoid bad red objects:
+  - "CANNONS"
+  - "VIRAL LAWSUIT"
+  - "HR MEETING"
+  - "TABLOID HEADLINE"
+  - "COMPLIANCE REVIEW"
+- Collect good green/yellow objects:
+  - "Coffee"
+  - "Lawyer Shield"
+  - "HR Report"
+  - "NDA Umbrella"
+  - "Receipts?"
+- The longer the player survives, the faster and bouncier the cannons become.
+- Every 15 seconds, trigger a "Boardroom Panic Wave" where several cannons bounce across the screen.
+
+Hit reaction:
+- If player hits a cannon:
+  - show huge text: "CANNON INCIDENT ESCALATED!"
+  - screen shake
+  - cartoon BOING/BOOM particles
+  - finance bro facepalm animation
+  - papers fly everywhere
+  - game over
+
+Score:
+- Score label: "Boardroom Survived"
+- High score stored in localStorage using key: headlineArcade_bigCannons_highScore
+- Funny game over lines chosen randomly:
+  - "HR has entered the chat."
+  - "The boardroom could not contain the cannons."
+  - "Compliance is asking questions."
+  - "This meeting should have been an email."
+  - "The cannons were not priced in."
+
+UI:
+- Top bar:
+  - Big Cannons: Boardroom Escape
+  - Boardroom Survived: current score
+  - High Score
+- Instruction line:
+  - "Swipe or Arrow Keys to dodge the cannon chaos."
+- Game over buttons:
+  - PLAY AGAIN
+  - BACK TO HOME
+
+Make it addictive, smooth, mobile-friendly, and ridiculous. The joke is the absurd viral finance meme, not a real person.
