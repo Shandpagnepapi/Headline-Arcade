@@ -5,7 +5,7 @@ const HS_KEY = "headlineArcade_boardroomBalance_highScore";
 const NEON = "#00f7c0";
 const TABLE_W = 420;
 const TABLE_H = 22;
-const MAX_ANGLE = 0.72; // radians before game over (~41°)
+const MAX_ANGLE = 0.72;
 
 const GAME_OVER_LINES = [
   "MEETING OVER!",
@@ -13,15 +13,16 @@ const GAME_OVER_LINES = [
   "HR HAS ENTERED THE CHAT.",
   "COMPLIANCE REVIEW INITIATED.",
   "THE CANNONS WERE NOT PRICED IN.",
+  "BALANCE SHEET UNBALANCED.",
 ];
 
 const OBJECT_TYPES = [
-  { label: "NDA", color: "#fff", bg: "#cc1a00", w: 42, h: 30, weight: 1.0, emoji: "📄" },
-  { label: "COFFEE ☕", color: "#fff", bg: "#5c3317", w: 38, h: 34, weight: 0.7, emoji: "☕" },
-  { label: "BONUS 💰", color: "#000", bg: "#22cc55", w: 50, h: 26, weight: 0.5, emoji: "💰" },
-  { label: "HR FORM", color: "#fff", bg: "#aa00cc", w: 44, h: 30, weight: 1.2, emoji: "📋" },
-  { label: "📱 PHONE", color: "#fff", bg: "#222244", w: 28, h: 44, weight: 0.9, emoji: "📱" },
-  { label: "TICKER 📈", color: "#00ff88", bg: "#001a00", w: 56, h: 24, weight: 0.4, emoji: "📈" },
+  { label: "NDA", color: "#fff", bg: "#cc1a00", w: 42, h: 30, weight: 1.0 },
+  { label: "COFFEE ☕", color: "#fff", bg: "#5c3317", w: 38, h: 34, weight: 0.7 },
+  { label: "BONUS 💰", color: "#000", bg: "#22cc55", w: 50, h: 26, weight: 0.5 },
+  { label: "HR FORM", color: "#fff", bg: "#aa00cc", w: 44, h: 30, weight: 1.2 },
+  { label: "📱 PHONE", color: "#fff", bg: "#222244", w: 28, h: 44, weight: 0.9 },
+  { label: "TICKER 📈", color: "#00ff88", bg: "#001a00", w: 56, h: 24, weight: 0.4 },
 ];
 
 interface FallingObj {
@@ -30,189 +31,277 @@ interface FallingObj {
   landed: boolean; landedX: number; slidingOff: boolean;
   type: typeof OBJECT_TYPES[number];
 }
-
 interface Debris {
   x: number; y: number; vx: number; vy: number;
   angle: number; spin: number; life: number;
   color: string; label: string; size: number;
 }
 
-/* ── Exec character ── */
+/* ──────────────────────────────────────────────
+   EXEC CHARACTER – based on the reference image:
+   curvy cartoon exec, voluminous brown hair,
+   thick-rimmed glasses, black blazer, white shirt,
+   exaggerated bust with spring jiggle physics.
+────────────────────────────────────────────── */
 function drawExec(
   ctx: CanvasRenderingContext2D,
   cx: number, cy: number,
-  cannonJiggleL: number, cannonJiggleR: number,
-  vertBounceL: number, vertBounceR: number,
+  jiggleL: number, jiggleR: number,
+  bounceL: number, bounceR: number,
   expression: "normal" | "worried" | "panic" | "shrug",
-  tableTilt: number,
+  tilt: number,
   t: number
 ) {
   ctx.save();
   ctx.translate(cx, cy);
+  ctx.translate(-tilt * 12, 0);
 
-  // Body sway opposite to tilt
-  const bodySway = -tableTilt * 28;
-  ctx.translate(bodySway * 0.4, 0);
+  // ── Shadow ──
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.beginPath(); ctx.ellipse(0, 8, 30, 7, 0, 0, Math.PI * 2); ctx.fill();
 
-  // Shadow
-  ctx.fillStyle = "rgba(0,0,0,0.35)";
-  ctx.beginPath(); ctx.ellipse(0, 6, 34, 8, 0, 0, Math.PI * 2); ctx.fill();
+  // ── Legs + heels (pencil skirt covers upper legs) ──
+  // Stockings
+  ctx.fillStyle = "#1a0a0a";
+  ctx.beginPath(); ctx.roundRect(-11, 14, 9, 30, 3); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(2, 14, 9, 30, 3); ctx.fill();
+  // Heels
+  ctx.fillStyle = "#111";
+  ctx.beginPath(); ctx.roundRect(-14, 41, 12, 6, [2,2,0,0]); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(-12, 47, 4, 7, 2); ctx.fill(); // heel
+  ctx.beginPath(); ctx.roundRect(2, 41, 12, 6, [2,2,0,0]); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(8, 47, 4, 7, 2); ctx.fill();
 
-  // Legs
-  const legSwing = expression === "shrug" ? 0 : Math.sin(t * 0.18) * 8 * Math.max(0.2, Math.abs(tableTilt) * 2);
-  ctx.fillStyle = "#1a2d5a";
-  for (const [sx, sdir] of [[-10, 1], [10, -1]] as [number,number][]) {
-    ctx.save();
-    ctx.translate(sx, 0);
-    ctx.rotate((legSwing * sdir * Math.PI) / 180);
-    ctx.beginPath(); ctx.roundRect(-6, 0, 12, 26, 3); ctx.fill();
-    ctx.fillStyle = "#111"; ctx.beginPath(); ctx.roundRect(-7, 24, 14, 7, 2); ctx.fill();
-    ctx.restore();
-  }
+  // ── Pencil skirt ──
+  ctx.fillStyle = "#1a1a1a";
+  ctx.beginPath(); ctx.roundRect(-18, 8, 36, 22, [0,0,6,6]); ctx.fill();
+  ctx.strokeStyle = "#333"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(-18, 14); ctx.lineTo(18, 14); ctx.stroke(); // waist seam
 
-  // The suit jacket base
-  ctx.fillStyle = "#1e3a70";
-  ctx.beginPath(); ctx.roundRect(-26, -34, 52, 38, 6); ctx.fill();
+  // ── Jacket base ──
+  ctx.fillStyle = "#1c1c1c";
+  ctx.beginPath(); ctx.roundRect(-24, -36, 48, 48, 5); ctx.fill();
 
-  // LEFT CANNON (oversized sphere under jacket, left side)
-  const cannonLX = -22 + cannonJiggleL * 0.9;
-  const cannonLY = -16 + vertBounceL;
-  const cannonR = 22;
-  ctx.save();
-  ctx.translate(cannonLX, cannonLY);
-  const gradL = ctx.createRadialGradient(-6, -6, 2, 0, 0, cannonR);
-  gradL.addColorStop(0, "#f0c8a0"); gradL.addColorStop(0.6, "#d4a070"); gradL.addColorStop(1, "#a07040");
-  ctx.fillStyle = gradL;
-  ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 8;
-  ctx.beginPath(); ctx.arc(0, 0, cannonR, 0, Math.PI * 2); ctx.fill();
-  ctx.shadowBlur = 0;
-  // Jiggle highlight
-  ctx.fillStyle = "rgba(255,255,255,0.22)";
-  ctx.beginPath(); ctx.arc(-7, -7, 9, 0, Math.PI * 2); ctx.fill();
-  // Tiny barrel on top
-  ctx.fillStyle = "#666"; ctx.strokeStyle = "#888"; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.roundRect(-3, -cannonR - 10, 6, 12, 2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = "#444"; ctx.beginPath(); ctx.roundRect(-4, -cannonR - 12, 8, 5, 2); ctx.fill();
-  ctx.restore();
-
-  // RIGHT CANNON
-  const cannonRX = 22 + cannonJiggleR * 0.9;
-  const cannonRY = -16 + vertBounceR;
-  ctx.save();
-  ctx.translate(cannonRX, cannonRY);
-  const gradR = ctx.createRadialGradient(-6, -6, 2, 0, 0, cannonR);
-  gradR.addColorStop(0, "#f0c8a0"); gradR.addColorStop(0.6, "#d4a070"); gradR.addColorStop(1, "#a07040");
-  ctx.fillStyle = gradR;
-  ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 8;
-  ctx.beginPath(); ctx.arc(0, 0, cannonR, 0, Math.PI * 2); ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = "rgba(255,255,255,0.22)";
-  ctx.beginPath(); ctx.arc(-7, -7, 9, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#666"; ctx.strokeStyle = "#888"; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.roundRect(-3, -cannonR - 10, 6, 12, 2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = "#444"; ctx.beginPath(); ctx.roundRect(-4, -cannonR - 12, 8, 5, 2); ctx.fill();
-  ctx.restore();
-
-  // Jacket overlay (covers lower part of cannons)
-  ctx.fillStyle = "#1e3a70";
-  ctx.beginPath(); ctx.roundRect(-28, -12, 56, 20, [0,0,6,6]); ctx.fill();
-  // Jacket lapels
+  // ── White shirt visible in jacket opening ──
   ctx.fillStyle = "#f0f0f0";
-  ctx.beginPath(); ctx.moveTo(-4, -34); ctx.lineTo(0, -18); ctx.lineTo(4, -34); ctx.closePath(); ctx.fill();
-  // Tie wobble
-  const tieWiggle = tableTilt * 22 + Math.sin(t * 0.12) * 6;
-  ctx.fillStyle = "#cc0000";
-  ctx.save(); ctx.translate(0, -22); ctx.rotate((tieWiggle * Math.PI) / 180);
-  ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(0, 20); ctx.lineTo(4, 0); ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-6, -36);
+  ctx.lineTo(-8, 8);
+  ctx.lineTo(8, 8);
+  ctx.lineTo(6, -36);
+  ctx.closePath(); ctx.fill();
+
+  // ── THE CANNONS — exaggerated cartoon bust with jiggle physics ──
+  // Left cannon
+  const lx = -12 + jiggleL * 0.85;
+  const ly = -18 + bounceL;
+  ctx.save();
+  ctx.translate(lx, ly);
+  // Main shape
+  const gradL = ctx.createRadialGradient(-4, -5, 2, 0, 0, 20);
+  gradL.addColorStop(0, "#fce0c0");
+  gradL.addColorStop(0.6, "#f4c090");
+  gradL.addColorStop(1, "#d49060");
+  ctx.fillStyle = gradL;
+  ctx.beginPath(); ctx.ellipse(0, 0, 19, 17, -0.15, 0, Math.PI * 2); ctx.fill();
+  // Highlight
+  ctx.fillStyle = "rgba(255,255,255,0.2)";
+  ctx.beginPath(); ctx.ellipse(-5, -5, 8, 6, -0.3, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 
-  // Shoulders (power suit)
-  ctx.fillStyle = "#253d80";
-  ctx.beginPath(); ctx.roundRect(-32, -36, 20, 12, [8,8,0,0]); ctx.fill();
-  ctx.beginPath(); ctx.roundRect(12, -36, 20, 12, [8,8,0,0]); ctx.fill();
+  // Right cannon
+  const rx = 12 + jiggleR * 0.85;
+  const ry = -18 + bounceR;
+  ctx.save();
+  ctx.translate(rx, ry);
+  const gradR = ctx.createRadialGradient(-4, -5, 2, 0, 0, 20);
+  gradR.addColorStop(0, "#fce0c0");
+  gradR.addColorStop(0.6, "#f4c090");
+  gradR.addColorStop(1, "#d49060");
+  ctx.fillStyle = gradR;
+  ctx.beginPath(); ctx.ellipse(0, 0, 19, 17, 0.15, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.2)";
+  ctx.beginPath(); ctx.ellipse(-5, -5, 8, 6, -0.3, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
 
-  // Arms in shrug mode
-  if (expression === "shrug") {
-    ctx.fillStyle = "#1e3a70";
-    ctx.save(); ctx.translate(-28, -28); ctx.rotate(-0.9);
-    ctx.beginPath(); ctx.roundRect(-5, -5, 10, 24, 4); ctx.fill();
-    ctx.restore();
-    ctx.save(); ctx.translate(28, -28); ctx.rotate(0.9);
-    ctx.beginPath(); ctx.roundRect(-5, -5, 10, 24, 4); ctx.fill();
-    ctx.restore();
-    // hands
-    ctx.fillStyle = "#f4c88a";
-    ctx.beginPath(); ctx.arc(-42, -34, 7, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(42, -34, 7, 0, Math.PI * 2); ctx.fill();
-  }
-
-  // Head
-  ctx.fillStyle = "#f4c88a";
-  ctx.beginPath(); ctx.arc(0, -52, 22, 0, Math.PI * 2); ctx.fill();
-
-  // Big hair (power hair)
-  const hairShake = expression === "panic" ? Math.sin(t * 0.25) * 6 : tableTilt * 10;
-  ctx.fillStyle = "#2c1a0e";
+  // ── Jacket lapels (overlay over cannons' lower portion) ──
+  ctx.fillStyle = "#1c1c1c";
+  // Left lapel
   ctx.beginPath();
-  ctx.moveTo(-22, -56);
-  ctx.bezierCurveTo(-30 + hairShake * 0.3, -90 + hairShake, -20 + hairShake * 0.5, -98, 0 + hairShake * 0.2, -96);
-  ctx.bezierCurveTo(22 + hairShake * 0.5, -96, 32 + hairShake * 0.3, -88, 24, -56);
+  ctx.moveTo(-24, -36);
+  ctx.lineTo(-6, -10);
+  ctx.lineTo(-6, 12);
+  ctx.lineTo(-24, 12);
   ctx.closePath(); ctx.fill();
-  // Hair volume highlights
-  ctx.fillStyle = "#3d2510";
-  ctx.beginPath(); ctx.ellipse(-6 + hairShake * 0.2, -80, 12, 18, -0.2, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(8 + hairShake * 0.3, -82, 14, 20, 0.3, 0, Math.PI * 2); ctx.fill();
+  // Right lapel
+  ctx.beginPath();
+  ctx.moveTo(24, -36);
+  ctx.lineTo(6, -10);
+  ctx.lineTo(6, 12);
+  ctx.lineTo(24, 12);
+  ctx.closePath(); ctx.fill();
+  // Jacket outline stitching
+  ctx.strokeStyle = "#2a2a2a"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(-24, -36); ctx.lineTo(-6, -10); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(24, -36); ctx.lineTo(6, -10); ctx.stroke();
 
-  // Eyes
-  const eyeY = -54;
-  ctx.fillStyle = "#fff";
-  ctx.beginPath(); ctx.ellipse(-8, eyeY, 7, 8, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(8, eyeY, 7, 8, 0, 0, Math.PI * 2); ctx.fill();
-
-  const pupilShift = tableTilt * 4;
+  // ── Jacket shoulders (power suit) ──
   ctx.fillStyle = "#222";
-  ctx.beginPath(); ctx.arc(-8 + pupilShift, eyeY + 1, 4, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(8 + pupilShift, eyeY + 1, 4, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#fff";
-  ctx.beginPath(); ctx.arc(-6.5 + pupilShift, eyeY - 0.5, 1.8, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(9.5 + pupilShift, eyeY - 0.5, 1.8, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(-28, -38, 16, 10, [6,6,0,0]); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(12, -38, 16, 10, [6,6,0,0]); ctx.fill();
 
-  // Eyebrows
-  ctx.strokeStyle = "#2c1a0e"; ctx.lineWidth = 2.5;
-  if (expression === "panic" || expression === "worried") {
-    ctx.beginPath(); ctx.moveTo(-15, eyeY - 10); ctx.lineTo(-1, eyeY - 6); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(15, eyeY - 10); ctx.lineTo(1, eyeY - 6); ctx.stroke();
-  } else {
-    ctx.beginPath(); ctx.moveTo(-14, eyeY - 9); ctx.quadraticCurveTo(-8, eyeY - 12, -2, eyeY - 8); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(14, eyeY - 9); ctx.quadraticCurveTo(8, eyeY - 12, 2, eyeY - 8); ctx.stroke();
-  }
-
-  // Mouth
-  ctx.strokeStyle = "#8b5e3c"; ctx.lineWidth = 2;
-  if (expression === "panic") {
-    ctx.beginPath(); ctx.arc(0, -44, 7, 0.2, Math.PI - 0.2); ctx.stroke();
-    // sweat
-    ctx.fillStyle = "#aaddff"; ctx.globalAlpha = 0.9;
-    ctx.beginPath(); ctx.ellipse(24, -52, 3, 6, 0.3, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
-  } else if (expression === "shrug") {
-    ctx.beginPath(); ctx.moveTo(-6, -44); ctx.lineTo(6, -44); ctx.stroke();
-  } else if (expression === "worried") {
-    ctx.beginPath(); ctx.arc(0, -42, 5, 0.3, Math.PI - 0.3, false); ctx.stroke();
-  } else {
-    ctx.beginPath(); ctx.arc(0, -46, 4, 0.1, Math.PI - 0.1, true); ctx.stroke();
-  }
-
-  // Speech bubble for shrug
+  // ── Arms ──
   if (expression === "shrug") {
-    ctx.fillStyle = "#fffbe6"; ctx.strokeStyle = "#cc1a00"; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.roundRect(20, -110, 100, 40, 10); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(30, -70); ctx.lineTo(20, -60); ctx.lineTo(42, -70); ctx.fill();
-    ctx.fillStyle = "#cc1a00"; ctx.font = "bold 9px 'Orbitron', sans-serif";
+    // Both arms up shrug
+    ctx.fillStyle = "#1c1c1c";
+    ctx.save(); ctx.translate(-28, -28); ctx.rotate(-0.85);
+    ctx.beginPath(); ctx.roundRect(-5, -5, 11, 22, 4); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(28, -28); ctx.rotate(0.85);
+    ctx.beginPath(); ctx.roundRect(-6, -5, 11, 22, 4); ctx.fill(); ctx.restore();
+    // hands
+    const skin = "#f4c090";
+    ctx.fillStyle = skin;
+    ctx.beginPath(); ctx.arc(-40, -36, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(40, -36, 7, 0, Math.PI * 2); ctx.fill();
+  } else {
+    // Right arm out holding coffee cup
+    ctx.fillStyle = "#1c1c1c";
+    ctx.save(); ctx.translate(28, -22); ctx.rotate(0.4);
+    ctx.beginPath(); ctx.roundRect(-5, -5, 10, 24, 4); ctx.fill();
+    // Hand + coffee
+    ctx.translate(2, 22);
+    ctx.fillStyle = "#f4c090"; ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
+    // Coffee cup
+    ctx.fillStyle = "#8B5E3C"; ctx.strokeStyle = "#5c3317"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(-7, 2, 14, 18, [0,0,3,3]); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#111"; ctx.beginPath(); ctx.roundRect(-7, 2, 14, 5, [0,0,0,0]); ctx.fill(); // lid
+    ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.font = "bold 7px sans-serif";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("¯\\_(ツ)_/¯", 70, -96);
-    ctx.fillText("cannons will be", 70, -83);
-    ctx.fillText("cannons!", 70, -70);
+    ctx.fillText("JP", 0, 11);
+    ctx.restore();
+
+    // Left arm at waist
+    ctx.fillStyle = "#1c1c1c";
+    ctx.save(); ctx.translate(-28, -10); ctx.rotate(-0.15);
+    ctx.beginPath(); ctx.roundRect(-5, -5, 10, 20, 4); ctx.fill();
+    ctx.fillStyle = "#f4c090"; ctx.beginPath(); ctx.arc(0, 18, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  // ── Necklace ──
+  ctx.strokeStyle = "#d4a000"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, -38, 10, 0.2, Math.PI - 0.2); ctx.stroke();
+  ctx.fillStyle = "#d4a000"; ctx.beginPath(); ctx.arc(0, -28, 3, 0, Math.PI * 2); ctx.fill();
+
+  // ── Head ──
+  ctx.fillStyle = "#f4c090";
+  ctx.beginPath(); ctx.arc(0, -56, 24, 0, Math.PI * 2); ctx.fill();
+  // Chin/jaw shape
+  ctx.beginPath(); ctx.ellipse(0, -40, 16, 10, 0, 0, Math.PI); ctx.fill();
+
+  // ── Voluminous Brown Hair ──
+  const hairShake = expression === "panic" ? Math.sin(t * 0.22) * 7 : tilt * 10;
+  ctx.fillStyle = "#4a2810";
+  // Back hair mass
+  ctx.beginPath();
+  ctx.ellipse(0, -58, 30, 28, 0, 0, Math.PI * 2); ctx.fill();
+  // Left wave
+  ctx.beginPath();
+  ctx.moveTo(-24, -52);
+  ctx.bezierCurveTo(-42 + hairShake * 0.3, -72, -36 + hairShake * 0.4, -84, -14 + hairShake * 0.3, -82);
+  ctx.bezierCurveTo(-10, -80, -16, -68, -24, -52); ctx.fill();
+  // Right wave
+  ctx.fillStyle = "#5a3318";
+  ctx.beginPath();
+  ctx.moveTo(24, -52);
+  ctx.bezierCurveTo(40 + hairShake * 0.3, -68, 38 + hairShake * 0.35, -82, 16 + hairShake * 0.25, -82);
+  ctx.bezierCurveTo(12, -80, 18, -66, 24, -52); ctx.fill();
+  // Top volume
+  ctx.fillStyle = "#3d2008";
+  ctx.beginPath();
+  ctx.ellipse(hairShake * 0.2, -76, 22, 16, 0, 0, Math.PI * 2); ctx.fill();
+  // Hair highlights
+  ctx.fillStyle = "rgba(180,120,60,0.3)";
+  ctx.beginPath(); ctx.ellipse(-8 + hairShake*0.1, -72, 8, 14, -0.3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(10 + hairShake*0.1, -74, 10, 16, 0.2, 0, Math.PI * 2); ctx.fill();
+
+  // ── Face skin (redraw over hair) ──
+  ctx.fillStyle = "#f4c090";
+  ctx.beginPath(); ctx.arc(0, -56, 21, 0, Math.PI * 2); ctx.fill();
+
+  // ── Pearl earrings ──
+  ctx.fillStyle = "#f5f0ee";
+  ctx.strokeStyle = "#ccc"; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.arc(-21, -52, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(21, -52, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+  // ── Glasses (thick black rims) ──
+  const gly = -60; // glasses Y
+  ctx.strokeStyle = "#111"; ctx.lineWidth = 3;
+  ctx.lineJoin = "round";
+  // Left lens
+  ctx.strokeRect(-20, gly - 6, 15, 11);
+  // Right lens
+  ctx.strokeRect(5, gly - 6, 15, 11);
+  // Bridge
+  ctx.beginPath(); ctx.moveTo(-5, gly - 1); ctx.lineTo(5, gly - 1); ctx.stroke();
+  // Temples
+  ctx.beginPath(); ctx.moveTo(-20, gly - 1); ctx.lineTo(-28, gly - 4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(20, gly - 1); ctx.lineTo(28, gly - 4); ctx.stroke();
+  // Lens tint
+  ctx.fillStyle = "rgba(150,200,255,0.08)";
+  ctx.fillRect(-20, gly - 6, 15, 11); ctx.fillRect(5, gly - 6, 15, 11);
+  // Pupils behind glasses
+  ctx.fillStyle = "#4a2010";
+  ctx.beginPath(); ctx.arc(-12, gly - 1, 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(12, gly - 1, 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(-10.5, gly - 2, 1.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(13.5, gly - 2, 1.5, 0, Math.PI * 2); ctx.fill();
+
+  // ── Eyebrows ──
+  ctx.strokeStyle = "#2c1a0a"; ctx.lineWidth = 2;
+  if (expression === "panic" || expression === "worried") {
+    ctx.beginPath(); ctx.moveTo(-20, gly - 10); ctx.lineTo(-6, gly - 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(20, gly - 10); ctx.lineTo(6, gly - 8); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.moveTo(-20, gly - 9); ctx.quadraticCurveTo(-13, gly - 13, -6, gly - 9); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(20, gly - 9); ctx.quadraticCurveTo(13, gly - 13, 6, gly - 9); ctx.stroke();
+  }
+
+  // ── Mouth ──
+  ctx.strokeStyle = "#b06040"; ctx.lineWidth = 1.8;
+  const mouthY = -47;
+  if (expression === "panic") {
+    // Open mouth (o shape)
+    ctx.fillStyle = "#cc4040"; ctx.beginPath(); ctx.ellipse(0, mouthY, 6, 7, 0, 0, Math.PI * 2); ctx.fill();
+    // Sweat
+    ctx.fillStyle = "#aaddff";
+    ctx.beginPath(); ctx.ellipse(26, -54, 3, 5, 0.4, 0, Math.PI * 2); ctx.fill();
+  } else if (expression === "shrug") {
+    ctx.beginPath(); ctx.moveTo(-5, mouthY); ctx.lineTo(5, mouthY); ctx.stroke();
+  } else if (expression === "worried") {
+    ctx.beginPath(); ctx.arc(0, mouthY + 3, 6, Math.PI + 0.3, -0.3, false); ctx.stroke();
+  } else {
+    // Confident smile
+    ctx.beginPath(); ctx.arc(0, mouthY - 1, 7, 0.1, Math.PI - 0.1, false); ctx.stroke();
+    ctx.fillStyle = "#cc6666"; ctx.beginPath(); ctx.arc(0, mouthY + 2, 4, 0.1, Math.PI - 0.1); ctx.fill();
+  }
+
+  // ── Rosy cheeks ──
+  ctx.fillStyle = "rgba(255,150,130,0.25)";
+  ctx.beginPath(); ctx.ellipse(-16, -50, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(16, -50, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
+
+  // ── Speech bubble on shrug ──
+  if (expression === "shrug") {
+    ctx.fillStyle = "#fffbe6"; ctx.strokeStyle = "#cc1a00"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(18, -115, 110, 44, 10); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(28, -71); ctx.lineTo(18, -60); ctx.lineTo(40, -71); ctx.fill();
+    ctx.fillStyle = "#cc1a00"; ctx.font = "bold 8px 'Orbitron', monospace";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("already priced in!", 73, -100);
+    ctx.fillText("¯\\_(ツ)_/¯", 73, -86);
   }
 
   ctx.restore();
@@ -230,57 +319,51 @@ function drawTable(
   ctx.translate(cx, cy);
   ctx.rotate(angle);
 
-  // Table wobble decorative lines (wood grain)
+  // Table surface
   ctx.fillStyle = "#1a3040";
   ctx.beginPath(); ctx.roundRect(-TABLE_W / 2, -TABLE_H / 2, TABLE_W, TABLE_H, 6); ctx.fill();
-
   ctx.strokeStyle = "rgba(0,247,192,0.4)"; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.roundRect(-TABLE_W / 2, -TABLE_H / 2, TABLE_W, TABLE_H, 6); ctx.stroke();
 
-  // Wood grain lines
-  ctx.strokeStyle = "rgba(0,247,192,0.08)"; ctx.lineWidth = 1;
-  for (let xi = -TABLE_W / 2 + 20; xi < TABLE_W / 2; xi += 30) {
-    const wobble = Math.sin(xi * 0.04 + t * 0.03) * 2;
-    ctx.beginPath(); ctx.moveTo(xi, -TABLE_H / 2 + 4 + wobble); ctx.lineTo(xi + 8, TABLE_H / 2 - 4 + wobble); ctx.stroke();
+  // Wood grain
+  ctx.strokeStyle = "rgba(0,247,192,0.06)"; ctx.lineWidth = 1;
+  for (let xi = -TABLE_W / 2 + 20; xi < TABLE_W / 2; xi += 28) {
+    const w = Math.sin(xi * 0.05 + t * 0.02) * 2;
+    ctx.beginPath(); ctx.moveTo(xi, -TABLE_H / 2 + 3 + w); ctx.lineTo(xi + 6, TABLE_H / 2 - 3 + w); ctx.stroke();
   }
 
-  // Table legs (dangling)
-  ctx.fillStyle = "#0d2030"; ctx.strokeStyle = "rgba(0,247,192,0.3)"; ctx.lineWidth = 1.5;
-  for (const legX of [-TABLE_W / 2 + 30, TABLE_W / 2 - 30]) {
-    ctx.beginPath(); ctx.roundRect(legX - 8, TABLE_H / 2, 16, 38, 3); ctx.fill(); ctx.stroke();
-    // foot
-    ctx.beginPath(); ctx.roundRect(legX - 12, TABLE_H / 2 + 34, 24, 6, 2); ctx.fill(); ctx.stroke();
+  // Table legs
+  ctx.fillStyle = "#0d2030"; ctx.strokeStyle = "rgba(0,247,192,0.25)"; ctx.lineWidth = 1.5;
+  for (const lx of [-TABLE_W / 2 + 28, TABLE_W / 2 - 28]) {
+    ctx.beginPath(); ctx.roundRect(lx - 8, TABLE_H / 2, 16, 36, 3); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(lx - 12, TABLE_H / 2 + 32, 24, 6, 2); ctx.fill(); ctx.stroke();
   }
 
-  // Render landed objects on table surface
+  // Landed objects
   for (const obj of landedObjs) {
-    if (obj.landed && !obj.slidingOff) {
-      const ox = obj.landedX;
+    if (!obj.slidingOff) {
       ctx.save();
-      ctx.translate(ox, -TABLE_H / 2 - obj.type.h / 2);
+      ctx.translate(obj.landedX, -TABLE_H / 2 - obj.type.h / 2);
       ctx.rotate(obj.angle);
-      ctx.fillStyle = obj.type.bg; ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = 1.5;
+      ctx.fillStyle = obj.type.bg; ctx.strokeStyle = "rgba(255,255,255,0.25)"; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.roundRect(-obj.type.w / 2, -obj.type.h / 2, obj.type.w, obj.type.h, 4); ctx.fill(); ctx.stroke();
       ctx.fillStyle = obj.type.color; ctx.font = "bold 8px 'Orbitron', monospace";
-      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(obj.label, 0, 0);
+      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(obj.type.label, 0, 0);
       ctx.restore();
     }
   }
-
   ctx.restore();
 }
 
-/* ── Falling object draw ── */
 function drawFallingObj(ctx: CanvasRenderingContext2D, obj: FallingObj) {
   ctx.save(); ctx.translate(obj.x, obj.y); ctx.rotate(obj.angle);
-  ctx.fillStyle = obj.type.bg; ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = 1.5;
+  ctx.fillStyle = obj.type.bg; ctx.strokeStyle = "rgba(255,255,255,0.25)"; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.roundRect(-obj.type.w / 2, -obj.type.h / 2, obj.type.w, obj.type.h, 4); ctx.fill(); ctx.stroke();
   ctx.fillStyle = obj.type.color; ctx.font = "bold 8px 'Orbitron', monospace";
   ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(obj.type.label, 0, 0);
   ctx.restore();
 }
 
-/* ── Submit score ── */
 async function submitScore(playerName: string, score: number) {
   await fetch("/api/scores", {
     method: "POST",
@@ -299,30 +382,22 @@ export default function CannonGame() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Physics state
   const G = useRef({
-    // Table
-    tableAngle: 0,
-    tableAngularVel: 0,
-    // "Cannon" jiggle physics - each sphere has horizontal + vertical offset from rest
-    cannonJiggleL: 0, cannonJiggleVelL: 0,
-    cannonJiggleR: 0, cannonJiggleVelR: 0,
-    cannonBounceL: 0, cannonBounceVelL: 0,  // vertical bounce
-    cannonBounceR: 0, cannonBounceVelR: 0,
-    // Player input
-    inputTorque: 0,
-    tiltLeft: false, tiltRight: false,
-    // Falling objects
+    tableAngle: 0, tableAngularVel: 0,
+    jiggleL: 0, velJiggleL: 0,
+    jiggleR: 0, velJiggleR: 0,
+    bounceL: 0, velBounceL: 0,
+    bounceR: 0, velBounceR: 0,
+    // All hold-input flags (keyboard + mouse)
+    holdLeft: false, holdRight: false,
+    // Touch
+    touchSX: 0,
     objs: [] as FallingObj[],
-    spawnTimer: 0,
-    // Debris (game over explosion)
     debris: [] as Debris[],
-    // Score
+    spawnTimer: 0,
     score: 0, scoreTimer: 0,
-    // State
     expression: "normal" as "normal" | "worried" | "panic" | "shrug",
     t: 0, raf: 0, running: false,
-    touchSX: 0,
     canvasW: 600, canvasH: 500,
     tableCX: 300, tableCY: 320,
   });
@@ -334,46 +409,39 @@ export default function CannonGame() {
     const finalScore = Math.floor(g.score);
     const newHs = Math.max(finalScore, parseInt(localStorage.getItem(HS_KEY) || "0"));
     localStorage.setItem(HS_KEY, String(newHs));
-    setHs(newHs);
-    setScoreDisplay(finalScore);
+    setHs(newHs); setScoreDisplay(finalScore);
     setGameOverLine(GAME_OVER_LINES[Math.floor(Math.random() * GAME_OVER_LINES.length)]);
     setSubmitted(false);
-
-    // Spawn debris explosion
-    const g2 = g;
-    for (let i = 0; i < 30; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const spd = 3 + Math.random() * 9;
-      g2.debris.push({
-        x: g2.tableCX + (Math.random() - 0.5) * TABLE_W,
-        y: g2.tableCY,
-        vx: Math.cos(a) * spd, vy: Math.sin(a) * spd - 4,
-        angle: Math.random() * Math.PI * 2,
-        spin: (Math.random() - 0.5) * 0.25,
-        life: 120,
-        color: ["#fff", "#22cc55", "#cc1a00", "#ffdd00", "#aaddff"][Math.floor(Math.random() * 5)],
-        label: ["NDA", "$$", "FIRED?", "HR!", "☕"][Math.floor(Math.random() * 5)],
-        size: 16 + Math.random() * 20,
+    // Debris explosion
+    for (let i = 0; i < 32; i++) {
+      const a = Math.random() * Math.PI * 2, spd = 3 + Math.random() * 10;
+      g.debris.push({
+        x: g.tableCX + (Math.random() - 0.5) * TABLE_W,
+        y: g.tableCY,
+        vx: Math.cos(a) * spd, vy: Math.sin(a) * spd - 5,
+        angle: Math.random() * Math.PI * 2, spin: (Math.random() - 0.5) * 0.3,
+        life: 130,
+        color: ["#fff", "#22cc55", "#cc1a00", "#ffdd00", "#aaddff", "#ff88ff"][Math.floor(Math.random() * 6)],
+        label: ["NDA", "$$", "FIRED?", "HR!", "☕", "WTF"][Math.floor(Math.random() * 6)],
+        size: 14 + Math.random() * 22,
       });
     }
-    setTimeout(() => setPhase("over"), 2200);
+    setTimeout(() => setPhase("over"), 2400);
   }, []);
 
   const startGame = useCallback(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     const g = G.current;
     g.tableAngle = 0; g.tableAngularVel = (Math.random() - 0.5) * 0.005;
-    g.cannonJiggleL = 0; g.cannonJiggleVelL = 0;
-    g.cannonJiggleR = 0; g.cannonJiggleVelR = 0;
-    g.cannonBounceL = 0; g.cannonBounceVelL = (Math.random() - 0.5) * 2;
-    g.cannonBounceR = 0; g.cannonBounceVelR = (Math.random() - 0.5) * 2;
-    g.inputTorque = 0; g.tiltLeft = false; g.tiltRight = false;
+    g.jiggleL = 0; g.velJiggleL = 0; g.jiggleR = 0; g.velJiggleR = 0;
+    g.bounceL = 0; g.velBounceL = (Math.random() - 0.5) * 1.5;
+    g.bounceR = 0; g.velBounceR = (Math.random() - 0.5) * 1.5;
+    g.holdLeft = false; g.holdRight = false;
     g.objs = []; g.debris = [];
     g.score = 0; g.scoreTimer = 0; g.t = 0;
     g.expression = "normal"; g.running = true;
     g.canvasW = canvas.clientWidth; g.canvasH = canvas.clientHeight;
-    g.tableCX = g.canvasW / 2;
-    g.tableCY = g.canvasH * 0.6;
+    g.tableCX = g.canvasW / 2; g.tableCY = g.canvasH * 0.6;
     setScoreDisplay(0); setSubmitted(false); setPhase("playing");
   }, []);
 
@@ -402,49 +470,45 @@ export default function CannonGame() {
     };
     resize(); window.addEventListener("resize", resize);
 
-    // Keyboard
+    // ── Keyboard: hold for continuous tilt ──
     const onKey = (e: KeyboardEvent) => {
       const g = G.current;
-      if (e.code === "ArrowLeft" || e.code === "KeyA") g.tiltLeft = e.type === "keydown";
-      if (e.code === "ArrowRight" || e.code === "KeyD") g.tiltRight = e.type === "keydown";
+      if (e.code === "ArrowLeft" || e.code === "KeyA") g.holdLeft = e.type === "keydown";
+      if (e.code === "ArrowRight" || e.code === "KeyD") g.holdRight = e.type === "keydown";
     };
-    window.addEventListener("keydown", onKey); window.addEventListener("keyup", onKey);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKey);
 
-    // Touch
-    const onTouchStart = (e: TouchEvent) => {
-      G.current.touchSX = e.touches[0].clientX;
+    // ── Mouse: hold LMB on left/right half for continuous tilt ──
+    const onMouseDown = (e: MouseEvent) => {
+      const g = G.current; if (!g.running) return;
+      if (e.clientX < g.canvasW / 2) g.holdLeft = true;
+      else g.holdRight = true;
     };
+    const onMouseUp = () => {
+      G.current.holdLeft = false; G.current.holdRight = false;
+    };
+    canvas.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("mouseup", onMouseUp);
+
+    // ── Touch: swipe or tap ──
+    const onTouchStart = (e: TouchEvent) => { G.current.touchSX = e.touches[0].clientX; };
     const onTouchEnd = (e: TouchEvent) => {
       const g = G.current; if (!g.running) return;
       const tx = e.changedTouches[0].clientX;
       const dx = tx - g.touchSX;
-      if (Math.abs(dx) > 12) {
-        // swipe
-        if (dx < 0) { g.tableAngularVel -= 0.022; }
-        else { g.tableAngularVel += 0.022; }
-      } else {
-        // tap: left or right half
-        if (tx < g.canvasW / 2) g.tableAngularVel -= 0.022;
-        else g.tableAngularVel += 0.022;
-      }
-      kickCannons(g, dx < 0 ? -1 : 1);
+      const dir = Math.abs(dx) > 14 ? (dx < 0 ? -1 : 1) : (tx < g.canvasW / 2 ? -1 : 1);
+      g.tableAngularVel += dir * 0.026;
+      kickCannons(g, dir);
     };
     canvas.addEventListener("touchstart", onTouchStart, { passive: true });
     canvas.addEventListener("touchend", onTouchEnd, { passive: true });
 
-    // Mouse click fallback
-    const onClick = (e: MouseEvent) => {
-      const g = G.current; if (!g.running) return;
-      if (e.clientX < g.canvasW / 2) { g.tableAngularVel -= 0.022; kickCannons(g, -1); }
-      else { g.tableAngularVel += 0.022; kickCannons(g, 1); }
-    };
-    canvas.addEventListener("click", onClick);
-
-    const kickCannons = (g: typeof G.current, dir: number) => {
-      g.cannonJiggleVelL += dir * (3 + Math.random() * 4);
-      g.cannonJiggleVelR -= dir * (3 + Math.random() * 4);
-      g.cannonBounceVelL -= 2 + Math.random() * 3;
-      g.cannonBounceVelR -= 2 + Math.random() * 3;
+    const kickCannons = (g: typeof G.current, dir: number, strength = 1) => {
+      g.velJiggleL += dir * (2.5 + Math.random() * 3.5) * strength;
+      g.velJiggleR -= dir * (2.5 + Math.random() * 3.5) * strength;
+      g.velBounceL -= (1.5 + Math.random() * 2) * strength;
+      g.velBounceR -= (1.5 + Math.random() * 2) * strength;
     };
 
     let lastTime = 0;
@@ -457,129 +521,100 @@ export default function CannonGame() {
       if (g.running) {
         g.t += dt;
         g.scoreTimer += dt;
-        if (g.scoreTimer >= 60) { g.score += 1; g.scoreTimer = 0; }
+        if (g.scoreTimer >= 60) { g.score++; g.scoreTimer = 0; }
 
-        // Keyboard tilt
-        if (g.tiltLeft) { g.tableAngularVel -= 0.0012 * dt; kickCannons(g, -0.05 * dt); }
-        if (g.tiltRight) { g.tableAngularVel += 0.0012 * dt; kickCannons(g, 0.05 * dt); }
+        // Hold input: smooth continuous torque (much better than click impulse)
+        const holdStrength = 0.0022;
+        if (g.holdLeft) {
+          g.tableAngularVel -= holdStrength * dt;
+          kickCannons(g, -1, 0.04 * dt);
+        }
+        if (g.holdRight) {
+          g.tableAngularVel += holdStrength * dt;
+          kickCannons(g, 1, 0.04 * dt);
+        }
 
-        // Table physics: gravity torque + damping + increasing difficulty
-        const difficultyDrift = 0.00004 * dt * Math.min(g.score * 0.3, 3);
-        g.tableAngularVel += Math.sin(g.tableAngle) * 0.008 * dt; // gravity
-        g.tableAngularVel += (Math.random() - 0.5) * difficultyDrift; // random chaos
-        g.tableAngularVel *= (1 - 0.018 * dt); // damping
+        // Table physics
+        const diff = 0.00005 * dt * Math.min(g.score * 0.4, 4);
+        g.tableAngularVel += Math.sin(g.tableAngle) * 0.009 * dt;
+        g.tableAngularVel += (Math.random() - 0.5) * diff;
+        g.tableAngularVel *= Math.pow(0.982, dt);
         g.tableAngle += g.tableAngularVel * dt;
 
-        // Cannon jiggle physics (spring + damping)
-        const K = 0.04, DAMP = 0.88;
-        // Horizontal jiggle: spring toward 0, pushed by tilt
-        const tiltForceL = -g.tableAngle * 8;
-        const tiltForceR = -g.tableAngle * 8;
-        g.cannonJiggleVelL += (-K * g.cannonJiggleL + tiltForceL) * dt * 0.5;
-        g.cannonJiggleVelL *= Math.pow(DAMP, dt);
-        g.cannonJiggleL += g.cannonJiggleVelL * dt;
-        g.cannonJiggleVelR += (-K * g.cannonJiggleR + tiltForceR) * dt * 0.5;
-        g.cannonJiggleVelR *= Math.pow(DAMP, dt);
-        g.cannonJiggleR += g.cannonJiggleVelR * dt;
+        // Cannon jiggle (horizontal spring)
+        const K = 0.038, D = 0.87;
+        const tF = -g.tableAngle * 7;
+        g.velJiggleL += (-K * g.jiggleL + tF) * dt * 0.45;
+        g.velJiggleL *= Math.pow(D, dt);
+        g.jiggleL += g.velJiggleL * dt;
+        g.velJiggleR += (-K * g.jiggleR + tF) * dt * 0.45;
+        g.velJiggleR *= Math.pow(D, dt);
+        g.jiggleR += g.velJiggleR * dt;
 
-        // Vertical bounce physics
-        const KB = 0.06, DAMPB = 0.85;
-        g.cannonBounceVelL += -KB * g.cannonBounceL * dt;
-        g.cannonBounceVelL *= Math.pow(DAMPB, dt);
-        g.cannonBounceL += g.cannonBounceVelL * dt;
-        g.cannonBounceVelR += -KB * g.cannonBounceR * dt;
-        g.cannonBounceVelR *= Math.pow(DAMPB, dt);
-        g.cannonBounceR += g.cannonBounceVelR * dt;
+        // Cannon bounce (vertical spring)
+        const KB = 0.055, DB = 0.84;
+        g.velBounceL += -KB * g.bounceL * dt;
+        g.velBounceL *= Math.pow(DB, dt);
+        g.bounceL += g.velBounceL * dt;
+        g.velBounceR += -KB * g.bounceR * dt;
+        g.velBounceR *= Math.pow(DB, dt);
+        g.bounceR += g.velBounceR * dt;
 
-        // Extra torque from cannon jiggle (they affect the balance!)
-        const cannonTorque = (g.cannonJiggleL - g.cannonJiggleR) * 0.00008;
-        g.tableAngularVel += cannonTorque * dt;
+        // Cannon jiggle affects balance
+        g.tableAngularVel += (g.jiggleL - g.jiggleR) * 0.00009 * dt;
 
-        // Spawn falling objects
+        // Spawn objects
         g.spawnTimer += dt;
-        const spawnInterval = Math.max(55, 110 - g.score * 1.5);
-        if (g.spawnTimer >= spawnInterval) {
+        const spawnInt = Math.max(52, 108 - g.score * 1.4);
+        if (g.spawnTimer >= spawnInt) {
           g.spawnTimer = 0;
           const type = OBJECT_TYPES[Math.floor(Math.random() * OBJECT_TYPES.length)];
-          const spawnX = g.tableCX + (Math.random() - 0.5) * TABLE_W * 1.4;
+          const sx = g.tableCX + (Math.random() - 0.5) * TABLE_W * 1.3;
           g.objs.push({
-            x: spawnX, y: -40, vy: 2.5 + Math.random() * 2, vx: (Math.random() - 0.5) * 1.5,
+            x: sx, y: -40, vy: 2.2 + Math.random() * 2, vx: (Math.random() - 0.5) * 1.5,
             angle: (Math.random() - 0.5) * 0.5, spin: (Math.random() - 0.5) * 0.06,
             landed: false, landedX: 0, slidingOff: false, type,
           });
         }
 
-        // Update falling objects
+        // Update objects
         for (const obj of g.objs) {
           if (obj.slidingOff) {
             obj.landedX += Math.sin(g.tableAngle) * 3.5 * dt;
-            obj.y += 2 * dt;
-            obj.angle += 0.05 * dt;
+            obj.y += 2 * dt; obj.angle += 0.06 * dt;
             continue;
           }
-          if (obj.landed) {
-            // Slide off if table too tilted
-            if (Math.abs(g.tableAngle) > 0.3) obj.slidingOff = true;
-            continue;
-          }
-          obj.x += obj.vx * dt;
-          obj.y += obj.vy * dt;
-          obj.angle += obj.spin * dt;
-
-          // Check if object hits table surface
-          // Table surface is at tableCY ± TABLE_H/2 in world space, rotated by tableAngle
-          // Simplified: check if obj.y > tableCY - TABLE_H/2 and obj.x is within table width
-          // Transform obj position into table local coordinates
-          const relX = obj.x - g.tableCX;
-          const relY = obj.y - g.tableCY;
-          const localX = relX * Math.cos(-g.tableAngle) - relY * Math.sin(-g.tableAngle);
-          const localY = relX * Math.sin(-g.tableAngle) + relY * Math.cos(-g.tableAngle);
-          if (localX > -TABLE_W / 2 && localX < TABLE_W / 2 && localY > -TABLE_H / 2 - 4 && localY < TABLE_H / 2) {
-            obj.landed = true;
-            obj.landedX = localX;
-            // Apply torque based on where it landed
-            const torque = (localX / (TABLE_W / 2)) * obj.type.weight * 0.005;
-            g.tableAngularVel += torque;
-            // Kick cannons when something lands
-            g.cannonBounceVelL -= 1.5 + Math.random();
-            g.cannonBounceVelR -= 1.5 + Math.random();
+          if (obj.landed) { if (Math.abs(g.tableAngle) > 0.28) obj.slidingOff = true; continue; }
+          obj.x += obj.vx * dt; obj.y += obj.vy * dt; obj.angle += obj.spin * dt;
+          // Collision with rotated table
+          const rx = obj.x - g.tableCX, ry = obj.y - g.tableCY;
+          const lx = rx * Math.cos(-g.tableAngle) - ry * Math.sin(-g.tableAngle);
+          const ly = rx * Math.sin(-g.tableAngle) + ry * Math.cos(-g.tableAngle);
+          if (lx > -TABLE_W / 2 && lx < TABLE_W / 2 && ly > -TABLE_H / 2 - 6 && ly < TABLE_H / 2) {
+            obj.landed = true; obj.landedX = lx;
+            g.tableAngularVel += (lx / (TABLE_W / 2)) * obj.type.weight * 0.006;
+            kickCannons(g, 0, 0.8);
           }
         }
         g.objs = g.objs.filter(o => o.y < H + 80 && !(o.slidingOff && o.y > H + 20));
 
-        // Expression based on angle
-        const absAngle = Math.abs(g.tableAngle);
-        if (absAngle > MAX_ANGLE * 0.75) g.expression = "panic";
-        else if (absAngle > MAX_ANGLE * 0.45) g.expression = "worried";
-        else g.expression = "normal";
+        const abs = Math.abs(g.tableAngle);
+        g.expression = abs > MAX_ANGLE * 0.75 ? "panic" : abs > MAX_ANGLE * 0.44 ? "worried" : "normal";
 
-        // Game over check
-        if (Math.abs(g.tableAngle) >= MAX_ANGLE) {
-          g.expression = "shrug";
-          endGame();
-        }
+        if (Math.abs(g.tableAngle) >= MAX_ANGLE) endGame();
       } else {
+        // Idle jiggle (funny on game over)
         g.t += dt;
-        // Keep cannon jiggling on game over (it's funny)
-        const K = 0.025, DAMP = 0.92;
-        g.cannonJiggleVelL += (-K * g.cannonJiggleL + (Math.random()-0.5)*0.5) * dt;
-        g.cannonJiggleVelL *= Math.pow(DAMP, dt);
-        g.cannonJiggleL += g.cannonJiggleVelL * dt;
-        g.cannonJiggleVelR += (-K * g.cannonJiggleR + (Math.random()-0.5)*0.5) * dt;
-        g.cannonJiggleVelR *= Math.pow(DAMP, dt);
-        g.cannonJiggleR += g.cannonJiggleVelR * dt;
-        g.cannonBounceVelL += (-0.04 * g.cannonBounceL) * dt;
-        g.cannonBounceVelL *= Math.pow(0.88, dt);
-        g.cannonBounceL += g.cannonBounceVelL * dt;
-        g.cannonBounceVelR += (-0.04 * g.cannonBounceR) * dt;
-        g.cannonBounceVelR *= Math.pow(0.88, dt);
-        g.cannonBounceR += g.cannonBounceVelR * dt;
+        const idle = (v: number, x: number) => { v += (-0.022 * x + (Math.random()-0.5)*0.4) * dt; return v * Math.pow(0.92, dt); };
+        g.velJiggleL = idle(g.velJiggleL, g.jiggleL); g.jiggleL += g.velJiggleL * dt;
+        g.velJiggleR = idle(g.velJiggleR, g.jiggleR); g.jiggleR += g.velJiggleR * dt;
+        g.velBounceL += -0.035 * g.bounceL * dt; g.velBounceL *= Math.pow(0.89, dt); g.bounceL += g.velBounceL * dt;
+        g.velBounceR += -0.035 * g.bounceR * dt; g.velBounceR *= Math.pow(0.89, dt); g.bounceR += g.velBounceR * dt;
       }
 
-      // Update debris
+      // Debris
       for (const d of g.debris) {
-        d.x += d.vx; d.y += d.vy; d.vy += 0.3; d.vx *= 0.97;
-        d.angle += d.spin; d.life--;
+        d.x += d.vx; d.y += d.vy; d.vy += 0.28; d.vx *= 0.97; d.angle += d.spin; d.life--;
       }
       g.debris = g.debris.filter(d => d.life > 0);
 
@@ -587,103 +622,88 @@ export default function CannonGame() {
     };
 
     const draw = (ctx: CanvasRenderingContext2D, W: number, H: number, g: typeof G.current) => {
-      // Background
-      const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-      bgGrad.addColorStop(0, "#06080f"); bgGrad.addColorStop(1, "#0a0a0f");
-      ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, W, H);
-
-      // Grid
-      ctx.strokeStyle = "rgba(0,247,192,0.03)"; ctx.lineWidth = 1;
+      // BG
+      ctx.fillStyle = "#06080f"; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = "rgba(0,247,192,0.025)"; ctx.lineWidth = 1;
       for (let x = 0; x < W; x += 50) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
       for (let y = 0; y < H; y += 50) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
 
-      // Boardroom wall decorations
-      // Stock ticker tape
-      ctx.fillStyle = "rgba(0,247,192,0.07)"; ctx.fillRect(0, H * 0.15, W, 28);
-      ctx.font = "bold 9px monospace"; ctx.fillStyle = "rgba(0,247,192,0.3)";
-      ctx.textBaseline = "middle";
-      const tickerStr = "  JPM ▲2.4%  MS ▼1.1%  GS ▲0.8%  CANNONS ▲∞%  HR ▼99%  COMPLIANCE ▲??%  ";
-      const tickerOffset = (g.t * 1.2) % (tickerStr.length * 6.5);
-      ctx.fillText(tickerStr.repeat(3), -tickerOffset, H * 0.15 + 14);
+      // Stock ticker
+      ctx.fillStyle = "rgba(0,247,192,0.06)"; ctx.fillRect(0, H * 0.14, W, 28);
+      ctx.font = "bold 9px monospace"; ctx.fillStyle = "rgba(0,247,192,0.28)"; ctx.textBaseline = "middle";
+      const tk = "  JPM ▲2.4%  GS ▲0.8%  CANNONS ▲∞%  HR ▼99%  COMPLIANCE ▲??%  BONUS ▼¿?%  ";
+      const toff = (g.t * 1.1) % (tk.length * 6.5);
+      ctx.fillText(tk.repeat(3), -toff, H * 0.14 + 14);
 
-      // "HR WARNING" sign on wall
-      ctx.fillStyle = "rgba(200,26,0,0.15)"; ctx.strokeStyle = "rgba(200,26,0,0.5)"; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.roundRect(W * 0.05, H * 0.25, 140, 52, 6); ctx.fill(); ctx.stroke();
+      // HR warning sign
+      ctx.fillStyle = "rgba(180,20,0,0.12)"; ctx.strokeStyle = "rgba(200,26,0,0.4)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(W * 0.04, H * 0.24, 148, 56, 6); ctx.fill(); ctx.stroke();
       ctx.fillStyle = "#ff6622"; ctx.font = "bold 8px 'Orbitron', monospace"; ctx.textAlign = "center";
-      ctx.fillText("⚠️ CANNON ACTIVITY", W * 0.05 + 70, H * 0.25 + 18);
-      ctx.fillText("REPORT TO HR ASAP", W * 0.05 + 70, H * 0.25 + 32);
+      ctx.fillText("⚠ CANNON ACTIVITY", W * 0.04 + 74, H * 0.24 + 18);
+      ctx.fillText("REPORT TO HR ASAP", W * 0.04 + 74, H * 0.24 + 32);
       ctx.fillStyle = "#ff4400"; ctx.font = "bold 7px monospace";
-      ctx.fillText("(they're always like this)", W * 0.05 + 70, H * 0.25 + 45);
+      ctx.fillText("(they're always like this)", W * 0.04 + 74, H * 0.24 + 46);
 
       // Whiteboard
-      ctx.fillStyle = "rgba(240,240,240,0.06)"; ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.roundRect(W * 0.68, H * 0.22, 150, 100, 4); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "rgba(230,230,230,0.05)"; ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(W * 0.7, H * 0.22, 145, 100, 4); ctx.fill(); ctx.stroke();
       ctx.fillStyle = "rgba(0,247,192,0.4)"; ctx.font = "bold 8px 'Orbitron', monospace"; ctx.textAlign = "center";
-      ctx.fillText("Q3 TARGETS:", W * 0.68 + 75, H * 0.22 + 18);
-      ctx.fillStyle = "rgba(200,26,0,0.7)";
-      ctx.font = "7px monospace"; ctx.textAlign = "left";
-      const wbLines = ["• More cannons", "• Keep table level", "• Deny everything", "• ??? ", "• Profit"];
-      wbLines.forEach((l, i) => ctx.fillText(l, W * 0.68 + 10, H * 0.22 + 34 + i * 14));
+      ctx.fillText("Q3 TARGETS:", W * 0.7 + 72, H * 0.22 + 18);
+      ctx.fillStyle = "rgba(200,26,0,0.65)"; ctx.font = "7px monospace"; ctx.textAlign = "left";
+      ["• More cannons", "• Keep table level", "• Deny everything", "• ???", "• Profit"].forEach((l, i) =>
+        ctx.fillText(l, W * 0.7 + 10, H * 0.22 + 34 + i * 13));
 
-      // Angle meter (tilt indicator)
-      const meterX = W - 38, meterY = H * 0.35, meterH = 160;
-      ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.strokeStyle = "rgba(0,247,192,0.3)"; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.roundRect(meterX - 10, meterY, 20, meterH, 4); ctx.fill(); ctx.stroke();
-      const fillH = (Math.abs(g.tableAngle) / MAX_ANGLE) * (meterH - 6);
-      const dangerColor = g.tableAngle > 0
-        ? `rgba(${Math.floor(fillH / (meterH - 6) * 255)},${Math.floor((1 - fillH / (meterH - 6)) * 200)},0,0.8)`
-        : `rgba(${Math.floor(fillH / (meterH - 6) * 255)},${Math.floor((1 - fillH / (meterH - 6)) * 200)},0,0.8)`;
-      ctx.fillStyle = dangerColor;
-      ctx.beginPath(); ctx.roundRect(meterX - 7, meterY + 3 + (meterH - 6 - fillH), 14, fillH, 3); ctx.fill();
-      ctx.fillStyle = "rgba(0,247,192,0.5)"; ctx.font = "bold 6px 'Orbitron', monospace";
-      ctx.textAlign = "center"; ctx.fillText("TILT", meterX, meterY - 8);
+      // Tilt meter
+      const mx = W - 36, my = H * 0.34, mh = 160;
+      ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.strokeStyle = "rgba(0,247,192,0.25)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(mx - 10, my, 20, mh, 4); ctx.fill(); ctx.stroke();
+      const fh = (Math.abs(g.tableAngle) / MAX_ANGLE) * (mh - 6);
+      const pct = fh / (mh - 6);
+      ctx.fillStyle = `rgba(${Math.floor(pct * 255)},${Math.floor((1-pct) * 200)},0,0.85)`;
+      ctx.beginPath(); ctx.roundRect(mx - 7, my + 3 + (mh - 6 - fh), 14, fh, 3); ctx.fill();
+      ctx.fillStyle = "rgba(0,247,192,0.45)"; ctx.font = "bold 6px 'Orbitron', monospace";
+      ctx.textAlign = "center"; ctx.fillText("TILT", mx, my - 8);
 
-      // Falling objects (not landed)
-      for (const obj of g.objs) if (!obj.landed) drawFallingObj(ctx, obj);
+      // Falling items
+      for (const o of g.objs) if (!o.landed) drawFallingObj(ctx, o);
 
-      // Table + landed objects
-      const landedObjs = g.objs.filter(o => o.landed);
-      drawTable(ctx, g.tableCX, g.tableCY, g.tableAngle, landedObjs, g.t);
+      // Table
+      drawTable(ctx, g.tableCX, g.tableCY, g.tableAngle, g.objs.filter(o=>o.landed), g.t);
 
-      // Exec on table
-      const execX = g.tableCX - g.tableAngle * 30;
-      const execY = g.tableCY - TABLE_H / 2 - 8;
-      drawExec(ctx, execX, execY,
-        g.cannonJiggleL, g.cannonJiggleR,
-        g.cannonBounceL, g.cannonBounceR,
-        g.expression, g.tableAngle, g.t);
+      // Exec character
+      const ex = g.tableCX - g.tableAngle * 28;
+      const ey = g.tableCY - TABLE_H / 2 - 10;
+      drawExec(ctx, ex, ey, g.jiggleL, g.jiggleR, g.bounceL, g.bounceR, g.expression, g.tableAngle, g.t);
 
       // Debris
       for (const d of g.debris) {
-        ctx.save(); ctx.globalAlpha = Math.min(1, d.life / 30);
+        ctx.save(); ctx.globalAlpha = Math.min(1, d.life / 35);
         ctx.translate(d.x, d.y); ctx.rotate(d.angle);
         ctx.fillStyle = d.color; ctx.font = `bold ${d.size}px monospace`;
-        ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.fillText(d.label, 0, 0);
+        ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(d.label, 0, 0);
         ctx.globalAlpha = 1; ctx.restore();
       }
 
-      // Angle warning flash
+      // Danger flash
       if (Math.abs(g.tableAngle) > MAX_ANGLE * 0.75 && g.running) {
-        ctx.fillStyle = `rgba(255,0,0,${0.06 + Math.sin(g.t * 0.3) * 0.04})`;
+        ctx.fillStyle = `rgba(255,0,0,${0.05 + Math.sin(g.t * 0.28) * 0.04})`;
         ctx.fillRect(0, 0, W, H);
       }
 
       // HUD
-      ctx.fillStyle = "rgba(0,0,0,0.82)"; ctx.fillRect(0, 0, W, 46);
-      ctx.strokeStyle = "rgba(0,247,192,0.3)"; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(0, 46); ctx.lineTo(W, 46); ctx.stroke();
-      ctx.font = "bold 12px 'Orbitron', monospace"; ctx.textBaseline = "middle"; ctx.textAlign = "left";
-      ctx.fillStyle = NEON; ctx.fillText(`BALANCED: ${Math.floor(g.score)}s`, 12, 23);
+      ctx.fillStyle = "rgba(0,0,0,0.85)"; ctx.fillRect(0, 0, W, 46);
+      ctx.strokeStyle = "rgba(0,247,192,0.28)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0,46); ctx.lineTo(W,46); ctx.stroke();
+      ctx.font = "bold 12px 'Orbitron', monospace"; ctx.textBaseline = "middle";
+      ctx.fillStyle = NEON; ctx.textAlign = "left"; ctx.fillText(`BALANCED: ${Math.floor(g.score)}s`, 12, 23);
       ctx.fillStyle = "#fff"; ctx.textAlign = "right";
-      ctx.fillText(`BEST: ${Math.max(Math.floor(g.score), parseInt(localStorage.getItem(HS_KEY)||"0"))}s`, W - 12, 23);
+      ctx.fillText(`BEST: ${Math.max(Math.floor(g.score), parseInt(localStorage.getItem(HS_KEY)||"0"))}s`, W-12, 23);
 
-      // Tap hints (fades out after 5s)
-      if (g.t < 300 && g.running) {
-        ctx.globalAlpha = Math.max(0, 1 - g.t / 200);
-        ctx.fillStyle = "rgba(0,247,192,0.7)"; ctx.font = "bold 11px 'Orbitron', monospace";
-        ctx.textAlign = "center";
-        ctx.fillText("← TAP LEFT    TAP RIGHT →", W / 2, H - 30);
+      // Hold hints
+      if (g.t < 280 && g.running) {
+        ctx.globalAlpha = Math.max(0, 1 - g.t / 180);
+        ctx.fillStyle = "rgba(0,247,192,0.65)"; ctx.font = "bold 11px 'Orbitron', monospace"; ctx.textAlign = "center";
+        ctx.fillText("HOLD LEFT  ◄  ►  HOLD RIGHT", W / 2, H - 28);
         ctx.globalAlpha = 1;
       }
     };
@@ -693,9 +713,10 @@ export default function CannonGame() {
       cancelAnimationFrame(G.current.raf);
       window.removeEventListener("resize", resize);
       window.removeEventListener("keydown", onKey); window.removeEventListener("keyup", onKey);
+      window.removeEventListener("mouseup", onMouseUp);
+      canvas.removeEventListener("mousedown", onMouseDown);
       canvas.removeEventListener("touchstart", onTouchStart);
       canvas.removeEventListener("touchend", onTouchEnd);
-      canvas.removeEventListener("click", onClick);
     };
   }, [endGame]);
 
@@ -713,9 +734,9 @@ export default function CannonGame() {
             <h2 className="text-white font-black text-3xl mb-4">BALANCE</h2>
             <div className="bg-white/5 border border-[#00f7c0]/20 rounded-2xl p-4 mb-6 text-sm text-white/70 space-y-2">
               <p>🎯 <span className="text-[#00f7c0] font-bold">Goal:</span> Keep the wobbly table balanced!</p>
-              <p>💥 The cannons jiggle and tip the table — hilarious chaos ensues.</p>
-              <p>📄 Falling office items make it even harder to balance.</p>
-              <p className="text-white/50 text-xs pt-1">Tap left/right · swipe · or ← → keys</p>
+              <p>💥 Her cannons jiggle and tip the table — physics are not optional.</p>
+              <p>📄 Falling office items make balance increasingly impossible.</p>
+              <p className="text-white/50 text-xs pt-1">Hold ◄ ► keys · Hold mouse button left/right · or swipe</p>
             </div>
             <button onClick={startGame} className="bg-[#00f7c0] text-black font-black text-xl px-12 py-4 rounded-xl w-full hover:bg-white transition-colors mb-3">
               PLAY
@@ -733,27 +754,21 @@ export default function CannonGame() {
             <p className="text-white/60 text-sm mb-4 italic">The cannons kept bouncing. Obviously.</p>
             <p className="text-[#00f7c0] text-4xl font-black mb-1">{scoreDisplay}<span className="text-lg">s</span></p>
             <p className="text-white/40 text-xs mb-5">Table Balanced · Best: {hs}s</p>
-
             {!submitted ? (
               <div className="mb-4">
                 <p className="text-white/60 text-xs mb-2">Enter your name for the leaderboard:</p>
-                <input
-                  type="text" maxLength={24} placeholder="Your name"
-                  value={playerName} onChange={(e) => setPlayerName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                  className="w-full bg-white/10 border border-[#00f7c0]/40 text-white text-center rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:border-[#00f7c0]"
-                />
+                <input type="text" maxLength={24} placeholder="Your name"
+                  value={playerName} onChange={e => setPlayerName(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleSubmit()}
+                  className="w-full bg-white/10 border border-[#00f7c0]/40 text-white text-center rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:border-[#00f7c0]" />
                 <button onClick={handleSubmit} disabled={submitting}
                   className="w-full border border-[#00f7c0] text-[#00f7c0] font-bold text-sm py-2 rounded-lg hover:bg-[#00f7c0]/10 transition-colors disabled:opacity-50">
                   {submitting ? "Submitting…" : "📊 Submit Score"}
                 </button>
               </div>
             ) : (
-              <div className="mb-4 py-2">
-                <p className="text-[#00f7c0] text-sm font-bold">✓ Score submitted!</p>
-              </div>
+              <div className="mb-4 py-2"><p className="text-[#00f7c0] text-sm font-bold">✓ Score submitted!</p></div>
             )}
-
             <button onClick={startGame} className="bg-[#00f7c0] text-black font-black text-lg px-8 py-4 rounded-xl w-full mb-3 hover:bg-white transition-colors">
               PLAY AGAIN
             </button>
