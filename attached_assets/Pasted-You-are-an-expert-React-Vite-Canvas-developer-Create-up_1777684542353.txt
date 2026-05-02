@@ -1,0 +1,29 @@
+You are an expert React + Vite + Canvas developer. Create / update the mini-game called "Cannon Boardroom Balance" for the Headline Arcade React app.
+
+Create / replace this exact file: src/pages/CannonBoardroomBalance.jsx
+
+Game concept (make it extremely funny and light-hearted):
+- Dark neon background (#0a0a0a) with cyan-green accents (#00f7c0)
+- Long wobbly boardroom table as the main platform
+- Cute, exaggerated CARTOON caricature of the JP Morgan exec (sharp power suit, big hair, big expressive face) drawn entirely with Canvas. She has ridiculously oversized bouncy cartoon cannons (large round spheres under the suit fabric with tiny barrels on top) that wobble, jiggle, and bounce with exaggerated silly physics every time she leans or the table tilts. Pure slapstick comedy — harmless and ridiculous.
+- Controls: Tap left / right (or swipe) to shift weight and keep the table balanced.
+- The cannons' jiggle directly affects how much the table tilts.
+- Falling chaotic office items (pulled from the real story): flying NDAs/confidentiality papers, spilling coffee cups, bonus checks/promotion letters, HR complaint forms, phones (monitoring), stock ticker symbols.
+- If the table tilts too far → everything topples in a giant cartoon explosion of papers, coffee, and money. Big text "MEETING OVER!" or "BONUS DENIED!" with the exec shrugging while her cannons keep bouncing wildly.
+- Score = "Seconds Balanced". Use localStorage for high score / leaderboard display.
+- Simple brief instructions at top: "Tap left/right or swipe to balance. Don't let the cannons tip the table!"
+
+UI:
+- Top bar: game title "Cannon Boardroom Balance" + live score + high score
+- Neon "PLAY AGAIN" and "BACK TO HOME" buttons on game over
+- Full-screen Canvas, mobile swipe support, 60fps smooth
+
+Use React hooks + pure Canvas game loop. Tailwind for page styling to match the neon dark site.
+
+Also update the homepage game grid:
+- Change the old cannons card title to "Cannon Boardroom Balance"
+- Update its thumbnail description to match the new balancing game (wobbly table + bouncing cannons)
+
+At the bottom of this file, output the exact code snippet to add/replace in App.jsx for the route /games/cannon-boardroom-balance
+
+Make the jiggle physics super exaggerated and hilarious. Pure comedy, zero negativity. Games must start instantly with no paywall or extra screens.

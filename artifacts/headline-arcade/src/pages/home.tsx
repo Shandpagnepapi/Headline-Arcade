@@ -18,7 +18,7 @@ const games = [
   {
     id: "game2",
     gameKey: "cannon",
-    title: "Big Cannons: Boardroom Escape",
+    title: "Cannon Boardroom Balance",
     img: `${BASE}/thumbs/bigcannons.png`,
     live: true,
   },

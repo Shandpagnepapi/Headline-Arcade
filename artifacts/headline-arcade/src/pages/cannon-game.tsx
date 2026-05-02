@@ -1,299 +1,286 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 
-const HS_KEY = "headlineArcade_bigCannons_highScore";
+const HS_KEY = "headlineArcade_boardroomBalance_highScore";
 const NEON = "#00f7c0";
+const TABLE_W = 420;
+const TABLE_H = 22;
+const MAX_ANGLE = 0.72; // radians before game over (~41°)
 
 const GAME_OVER_LINES = [
-  "HR has entered the chat.",
-  "The boardroom could not contain the cannons.",
-  "Compliance is asking questions.",
-  "This meeting should have been an email.",
-  "The cannons were not priced in.",
+  "MEETING OVER!",
+  "BONUS DENIED!",
+  "HR HAS ENTERED THE CHAT.",
+  "COMPLIANCE REVIEW INITIATED.",
+  "THE CANNONS WERE NOT PRICED IN.",
 ];
 
-const BAD_LABELS = [
-  "CANNONS",
-  "VIRAL\nLAWSUIT",
-  "HR\nMEETING",
-  "TABLOID\nHEADLINE",
-  "COMPLIANCE\nREVIEW",
+const OBJECT_TYPES = [
+  { label: "NDA", color: "#fff", bg: "#cc1a00", w: 42, h: 30, weight: 1.0, emoji: "📄" },
+  { label: "COFFEE ☕", color: "#fff", bg: "#5c3317", w: 38, h: 34, weight: 0.7, emoji: "☕" },
+  { label: "BONUS 💰", color: "#000", bg: "#22cc55", w: 50, h: 26, weight: 0.5, emoji: "💰" },
+  { label: "HR FORM", color: "#fff", bg: "#aa00cc", w: 44, h: 30, weight: 1.2, emoji: "📋" },
+  { label: "📱 PHONE", color: "#fff", bg: "#222244", w: 28, h: 44, weight: 0.9, emoji: "📱" },
+  { label: "TICKER 📈", color: "#00ff88", bg: "#001a00", w: 56, h: 24, weight: 0.4, emoji: "📈" },
 ];
 
-const GOOD_LABELS = [
-  "☕ Coffee",
-  "⚖️ Lawyer Shield",
-  "📋 HR Report",
-  "☂️ NDA Umbrella",
-  "🧾 Receipts?",
-];
-
-interface Cannon {
-  x: number; y: number; vx: number; vy: number;
-  r: number; wobble: number; wobbleV: number;
-  label: string; hit: boolean; kind: "cannon";
-}
-interface BadPaper {
-  x: number; y: number; vy: number; angle: number; spin: number;
-  w: number; h: number; label: string; hit: boolean; kind: "bad";
-}
-interface GoodObj {
-  x: number; y: number; vy: number; label: string;
-  collected: boolean; kind: "good"; bob: number;
-}
-interface Paper {
-  x: number; y: number; vx: number; vy: number;
-  angle: number; spin: number; life: number; w: number; h: number;
-}
-interface Particle {
-  x: number; y: number; vx: number; vy: number;
-  r: number; life: number; maxLife: number; color: string;
-}
-interface Pop {
-  x: number; y: number; text: string; life: number; color: string;
+interface FallingObj {
+  x: number; y: number; vy: number; vx: number;
+  angle: number; spin: number;
+  landed: boolean; landedX: number; slidingOff: boolean;
+  type: typeof OBJECT_TYPES[number];
 }
 
-/* ─── Draw a bouncing cartoon CANNON ─── */
-function drawCannon(ctx: CanvasRenderingContext2D, c: Cannon, t: number) {
-  ctx.save(); ctx.translate(c.x, c.y);
-  const squish = 1 + Math.sin(c.wobble) * 0.12;
-  ctx.scale(squish, 2 - squish);
-  ctx.shadowColor = "#ff3a3a"; ctx.shadowBlur = 18;
-  const grad = ctx.createRadialGradient(-c.r * 0.3, -c.r * 0.3, 0, 0, 0, c.r);
-  grad.addColorStop(0, "#ff6666"); grad.addColorStop(0.6, "#cc1a00"); grad.addColorStop(1, "#7a0000");
-  ctx.fillStyle = grad;
-  ctx.beginPath(); ctx.arc(0, 0, c.r, 0, Math.PI * 2); ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = "#ff8888"; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.arc(0, 0, c.r, 0, Math.PI * 2); ctx.stroke();
-  ctx.fillStyle = "rgba(255,255,255,0.18)";
-  ctx.beginPath(); ctx.arc(-c.r * 0.28, -c.r * 0.28, c.r * 0.38, 0, Math.PI * 2); ctx.fill();
-  const barrelAngle = Math.sin(t * 0.04 + c.wobble) * 0.3;
+interface Debris {
+  x: number; y: number; vx: number; vy: number;
+  angle: number; spin: number; life: number;
+  color: string; label: string; size: number;
+}
+
+/* ── Exec character ── */
+function drawExec(
+  ctx: CanvasRenderingContext2D,
+  cx: number, cy: number,
+  cannonJiggleL: number, cannonJiggleR: number,
+  vertBounceL: number, vertBounceR: number,
+  expression: "normal" | "worried" | "panic" | "shrug",
+  tableTilt: number,
+  t: number
+) {
   ctx.save();
-  ctx.rotate(barrelAngle);
-  ctx.fillStyle = "#880000"; ctx.strokeStyle = "#cc4444"; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.roundRect(-6, -c.r - 22, 12, 22, 3); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = "#660000";
-  ctx.beginPath(); ctx.roundRect(-8, -c.r - 26, 16, 8, 3); ctx.fill(); ctx.stroke();
-  ctx.restore();
-  ctx.fillStyle = "#fff"; ctx.font = `bold ${Math.floor(c.r * 0.42)}px 'Orbitron', monospace`;
-  ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText("CANNON", 0, c.r * 0.25);
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2 + t * 0.06; const br = c.r + 14;
-    ctx.fillStyle = i % 2 === 0 ? "#ffcc00" : "#ff6600";
-    ctx.beginPath(); ctx.arc(Math.cos(a) * br, Math.sin(a) * br, 4, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.restore();
-}
+  ctx.translate(cx, cy);
 
-/* ─── Draw a bad falling paper object ─── */
-function drawBadPaper(ctx: CanvasRenderingContext2D, o: BadPaper) {
-  ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(o.angle);
-  ctx.fillStyle = "#cc1a00"; ctx.strokeStyle = "#ff5555"; ctx.lineWidth = 2;
-  ctx.shadowColor = "#ff2200"; ctx.shadowBlur = 8;
-  ctx.beginPath(); ctx.roundRect(-o.w / 2, -o.h / 2, o.w, o.h, 6); ctx.fill(); ctx.stroke();
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = "#fff"; ctx.font = `bold 10px 'Orbitron', monospace`;
-  ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  const lines = o.label.split("\n");
-  lines.forEach((line, i) => ctx.fillText(line, 0, (i - (lines.length - 1) / 2) * 13));
-  ctx.restore();
-}
+  // Body sway opposite to tilt
+  const bodySway = -tableTilt * 28;
+  ctx.translate(bodySway * 0.4, 0);
 
-/* ─── Draw a good collectible ─── */
-function drawGoodObj(ctx: CanvasRenderingContext2D, o: GoodObj, t: number) {
-  ctx.save(); ctx.translate(o.x, o.y + Math.sin(t * 0.08 + o.bob) * 5);
-  ctx.shadowColor = "#44ff88"; ctx.shadowBlur = 16;
-  ctx.fillStyle = "#0d4a22"; ctx.strokeStyle = "#44ff88"; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.roundRect(-36, -16, 72, 32, 8); ctx.fill(); ctx.stroke();
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = "#aaffcc"; ctx.font = `bold 10.5px 'Orbitron', monospace`;
-  ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText(o.label, 0, 0);
-  ctx.restore();
-}
+  // Shadow
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.beginPath(); ctx.ellipse(0, 6, 34, 8, 0, 0, Math.PI * 2); ctx.fill();
 
-/* ─── Draw finance bro character ─── */
-function drawFinanceBro(ctx: CanvasRenderingContext2D, x: number, y: number, state: "run" | "panic" | "facepalm", t: number, moveDir: number) {
-  ctx.save(); ctx.translate(x, y);
-  if (state === "facepalm") ctx.rotate(Math.sin(t * 0.2) * 0.12);
-
-  /* shadow */
-  ctx.fillStyle = "rgba(0,0,0,0.3)";
-  ctx.beginPath(); ctx.ellipse(0, 42, 18, 5, 0, 0, Math.PI * 2); ctx.fill();
-
-  /* legs - running animation */
-  const legSwing = state === "run" ? Math.sin(t * 0.22) * 18 : 0;
+  // Legs
+  const legSwing = expression === "shrug" ? 0 : Math.sin(t * 0.18) * 8 * Math.max(0.2, Math.abs(tableTilt) * 2);
   ctx.fillStyle = "#1a2d5a";
-  ctx.save();
-  ctx.translate(-7, 24); ctx.rotate((legSwing * Math.PI) / 180);
-  ctx.beginPath(); ctx.roundRect(-5, 0, 10, 22, 3); ctx.fill();
-  ctx.fillStyle = "#111"; ctx.beginPath(); ctx.roundRect(-6, 20, 13, 6, 2); ctx.fill();
-  ctx.restore();
-  ctx.save();
-  ctx.translate(7, 24); ctx.rotate((-legSwing * Math.PI) / 180);
-  ctx.beginPath(); ctx.roundRect(-5, 0, 10, 22, 3); ctx.fill();
-  ctx.fillStyle = "#111"; ctx.beginPath(); ctx.roundRect(-6, 20, 13, 6, 2); ctx.fill();
-  ctx.restore();
-
-  /* body - suit */
-  ctx.fillStyle = "#1e3a70";
-  ctx.beginPath(); ctx.roundRect(-18, 0, 36, 28, 4); ctx.fill();
-  /* shirt + tie */
-  ctx.fillStyle = "#f0f0f0";
-  ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(0, 12); ctx.lineTo(5, 0); ctx.closePath(); ctx.fill();
-  const tieWiggle = state === "run" ? Math.sin(t * 0.22 + 1) * 8 : (state === "panic" ? Math.sin(t * 0.3) * 12 : 0);
-  ctx.fillStyle = "#cc0000";
-  ctx.save(); ctx.translate(0, 8); ctx.rotate((tieWiggle * Math.PI) / 180);
-  ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(0, 18); ctx.lineTo(3, 0); ctx.closePath(); ctx.fill();
-  ctx.restore();
-
-  /* coffee cup arm */
-  if (state !== "facepalm") {
-    const armSwing = state === "run" ? Math.sin(t * 0.22 + Math.PI) * 20 : 0;
+  for (const [sx, sdir] of [[-10, 1], [10, -1]] as [number,number][]) {
     ctx.save();
-    ctx.translate(20, 6); ctx.rotate((armSwing * Math.PI) / 180);
-    ctx.fillStyle = "#1e3a70"; ctx.beginPath(); ctx.roundRect(0, 0, 9, 16, 3); ctx.fill();
-    ctx.fillStyle = "#c0392b"; ctx.beginPath(); ctx.roundRect(8, 6, 16, 18, 4); ctx.fill();
-    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.roundRect(8, 6, 16, 5, [4, 4, 0, 0]); ctx.fill();
-    ctx.fillStyle = "#6b2c00"; ctx.beginPath(); ctx.arc(16, 9, 3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#1e3a70"; ctx.beginPath(); ctx.arc(20, 15, 5, 0.5, Math.PI - 0.5); ctx.stroke();
+    ctx.translate(sx, 0);
+    ctx.rotate((legSwing * sdir * Math.PI) / 180);
+    ctx.beginPath(); ctx.roundRect(-6, 0, 12, 26, 3); ctx.fill();
+    ctx.fillStyle = "#111"; ctx.beginPath(); ctx.roundRect(-7, 24, 14, 7, 2); ctx.fill();
     ctx.restore();
   }
 
-  /* head */
-  ctx.fillStyle = "#f4c88a";
-  ctx.beginPath(); ctx.arc(0, -18, 18, 0, Math.PI * 2); ctx.fill();
+  // The suit jacket base
+  ctx.fillStyle = "#1e3a70";
+  ctx.beginPath(); ctx.roundRect(-26, -34, 52, 38, 6); ctx.fill();
 
-  /* hair - tousled */
-  ctx.fillStyle = "#3a2010";
-  ctx.beginPath(); ctx.ellipse(0, -32, 18, 10, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#4a2c14";
-  ctx.beginPath(); ctx.ellipse(-10, -30, 9, 6, -0.4, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(10, -30, 9, 6, 0.4, 0, Math.PI * 2); ctx.fill();
-  if (state === "panic" || state === "facepalm") {
-    ctx.strokeStyle = "#4a2c14"; ctx.lineWidth = 3;
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2 + t * 0.04;
-      const r = 22;
-      ctx.beginPath(); ctx.moveTo(Math.cos(a) * r * 0.7, -18 + Math.sin(a) * r * 0.7); ctx.lineTo(Math.cos(a) * r, -18 + Math.sin(a) * r); ctx.stroke();
-    }
-  }
+  // LEFT CANNON (oversized sphere under jacket, left side)
+  const cannonLX = -22 + cannonJiggleL * 0.9;
+  const cannonLY = -16 + vertBounceL;
+  const cannonR = 22;
+  ctx.save();
+  ctx.translate(cannonLX, cannonLY);
+  const gradL = ctx.createRadialGradient(-6, -6, 2, 0, 0, cannonR);
+  gradL.addColorStop(0, "#f0c8a0"); gradL.addColorStop(0.6, "#d4a070"); gradL.addColorStop(1, "#a07040");
+  ctx.fillStyle = gradL;
+  ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 8;
+  ctx.beginPath(); ctx.arc(0, 0, cannonR, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+  // Jiggle highlight
+  ctx.fillStyle = "rgba(255,255,255,0.22)";
+  ctx.beginPath(); ctx.arc(-7, -7, 9, 0, Math.PI * 2); ctx.fill();
+  // Tiny barrel on top
+  ctx.fillStyle = "#666"; ctx.strokeStyle = "#888"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(-3, -cannonR - 10, 6, 12, 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#444"; ctx.beginPath(); ctx.roundRect(-4, -cannonR - 12, 8, 5, 2); ctx.fill();
+  ctx.restore();
 
-  /* big scared eyes */
-  const eyeY = -20;
-  ctx.fillStyle = "#fff";
-  ctx.beginPath(); ctx.ellipse(-7, eyeY, 6, 7, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(7, eyeY, 6, 7, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#222";
-  const pupilShift = state === "panic" ? 2 : 0;
-  ctx.beginPath(); ctx.arc(-7 + pupilShift, eyeY + 1, 3.5, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(7 + pupilShift, eyeY + 1, 3.5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#fff";
-  ctx.beginPath(); ctx.arc(-5.5 + pupilShift, eyeY - 0.5, 1.5, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(8.5 + pupilShift, eyeY - 0.5, 1.5, 0, Math.PI * 2); ctx.fill();
-  if (state === "panic") {
-    ctx.strokeStyle = "#555"; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(-13, eyeY - 8); ctx.lineTo(-1, eyeY - 4); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(13, eyeY - 8); ctx.lineTo(1, eyeY - 4); ctx.stroke();
-  }
+  // RIGHT CANNON
+  const cannonRX = 22 + cannonJiggleR * 0.9;
+  const cannonRY = -16 + vertBounceR;
+  ctx.save();
+  ctx.translate(cannonRX, cannonRY);
+  const gradR = ctx.createRadialGradient(-6, -6, 2, 0, 0, cannonR);
+  gradR.addColorStop(0, "#f0c8a0"); gradR.addColorStop(0.6, "#d4a070"); gradR.addColorStop(1, "#a07040");
+  ctx.fillStyle = gradR;
+  ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 8;
+  ctx.beginPath(); ctx.arc(0, 0, cannonR, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(255,255,255,0.22)";
+  ctx.beginPath(); ctx.arc(-7, -7, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#666"; ctx.strokeStyle = "#888"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(-3, -cannonR - 10, 6, 12, 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#444"; ctx.beginPath(); ctx.roundRect(-4, -cannonR - 12, 8, 5, 2); ctx.fill();
+  ctx.restore();
 
-  /* mouth */
-  ctx.strokeStyle = "#8b5e3c"; ctx.lineWidth = 2;
-  if (state === "facepalm") {
-    ctx.beginPath(); ctx.arc(0, -12, 6, 0, Math.PI); ctx.stroke();
+  // Jacket overlay (covers lower part of cannons)
+  ctx.fillStyle = "#1e3a70";
+  ctx.beginPath(); ctx.roundRect(-28, -12, 56, 20, [0,0,6,6]); ctx.fill();
+  // Jacket lapels
+  ctx.fillStyle = "#f0f0f0";
+  ctx.beginPath(); ctx.moveTo(-4, -34); ctx.lineTo(0, -18); ctx.lineTo(4, -34); ctx.closePath(); ctx.fill();
+  // Tie wobble
+  const tieWiggle = tableTilt * 22 + Math.sin(t * 0.12) * 6;
+  ctx.fillStyle = "#cc0000";
+  ctx.save(); ctx.translate(0, -22); ctx.rotate((tieWiggle * Math.PI) / 180);
+  ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(0, 20); ctx.lineTo(4, 0); ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  // Shoulders (power suit)
+  ctx.fillStyle = "#253d80";
+  ctx.beginPath(); ctx.roundRect(-32, -36, 20, 12, [8,8,0,0]); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(12, -36, 20, 12, [8,8,0,0]); ctx.fill();
+
+  // Arms in shrug mode
+  if (expression === "shrug") {
+    ctx.fillStyle = "#1e3a70";
+    ctx.save(); ctx.translate(-28, -28); ctx.rotate(-0.9);
+    ctx.beginPath(); ctx.roundRect(-5, -5, 10, 24, 4); ctx.fill();
+    ctx.restore();
+    ctx.save(); ctx.translate(28, -28); ctx.rotate(0.9);
+    ctx.beginPath(); ctx.roundRect(-5, -5, 10, 24, 4); ctx.fill();
+    ctx.restore();
+    // hands
     ctx.fillStyle = "#f4c88a";
-    ctx.beginPath(); ctx.roundRect(-10, -28, 22, 14, 5); ctx.fill();
-    ctx.beginPath(); ctx.roundRect(12, -25, 7, 20, 3); ctx.fill();
-  } else if (state === "panic") {
-    ctx.beginPath(); ctx.arc(0, -12, 5, 0, Math.PI); ctx.stroke();
-    ctx.strokeStyle = "#cc0000"; ctx.lineWidth = 1;
-    for (let i = 0; i < 3; i++) {
-      ctx.beginPath(); ctx.moveTo(-8 + i * 8, -26); ctx.lineTo(-6 + i * 8, -30); ctx.stroke();
-    }
+    ctx.beginPath(); ctx.arc(-42, -34, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(42, -34, 7, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Head
+  ctx.fillStyle = "#f4c88a";
+  ctx.beginPath(); ctx.arc(0, -52, 22, 0, Math.PI * 2); ctx.fill();
+
+  // Big hair (power hair)
+  const hairShake = expression === "panic" ? Math.sin(t * 0.25) * 6 : tableTilt * 10;
+  ctx.fillStyle = "#2c1a0e";
+  ctx.beginPath();
+  ctx.moveTo(-22, -56);
+  ctx.bezierCurveTo(-30 + hairShake * 0.3, -90 + hairShake, -20 + hairShake * 0.5, -98, 0 + hairShake * 0.2, -96);
+  ctx.bezierCurveTo(22 + hairShake * 0.5, -96, 32 + hairShake * 0.3, -88, 24, -56);
+  ctx.closePath(); ctx.fill();
+  // Hair volume highlights
+  ctx.fillStyle = "#3d2510";
+  ctx.beginPath(); ctx.ellipse(-6 + hairShake * 0.2, -80, 12, 18, -0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(8 + hairShake * 0.3, -82, 14, 20, 0.3, 0, Math.PI * 2); ctx.fill();
+
+  // Eyes
+  const eyeY = -54;
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.ellipse(-8, eyeY, 7, 8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(8, eyeY, 7, 8, 0, 0, Math.PI * 2); ctx.fill();
+
+  const pupilShift = tableTilt * 4;
+  ctx.fillStyle = "#222";
+  ctx.beginPath(); ctx.arc(-8 + pupilShift, eyeY + 1, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(8 + pupilShift, eyeY + 1, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(-6.5 + pupilShift, eyeY - 0.5, 1.8, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(9.5 + pupilShift, eyeY - 0.5, 1.8, 0, Math.PI * 2); ctx.fill();
+
+  // Eyebrows
+  ctx.strokeStyle = "#2c1a0e"; ctx.lineWidth = 2.5;
+  if (expression === "panic" || expression === "worried") {
+    ctx.beginPath(); ctx.moveTo(-15, eyeY - 10); ctx.lineTo(-1, eyeY - 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(15, eyeY - 10); ctx.lineTo(1, eyeY - 6); ctx.stroke();
   } else {
-    ctx.beginPath(); ctx.arc(0, -10, 4, 0.1, Math.PI - 0.1, true); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-14, eyeY - 9); ctx.quadraticCurveTo(-8, eyeY - 12, -2, eyeY - 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(14, eyeY - 9); ctx.quadraticCurveTo(8, eyeY - 12, 2, eyeY - 8); ctx.stroke();
   }
 
-  /* sweat drops when panicking */
-  if (state === "panic" || state === "run") {
-    ctx.fillStyle = "#aaddff"; ctx.globalAlpha = 0.8;
-    const sd = Math.sin(t * 0.15);
-    ctx.beginPath(); ctx.ellipse(20 + sd, -22 + Math.abs(sd) * 5, 3, 5, 0.2, 0, Math.PI * 2); ctx.fill();
+  // Mouth
+  ctx.strokeStyle = "#8b5e3c"; ctx.lineWidth = 2;
+  if (expression === "panic") {
+    ctx.beginPath(); ctx.arc(0, -44, 7, 0.2, Math.PI - 0.2); ctx.stroke();
+    // sweat
+    ctx.fillStyle = "#aaddff"; ctx.globalAlpha = 0.9;
+    ctx.beginPath(); ctx.ellipse(24, -52, 3, 6, 0.3, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
+  } else if (expression === "shrug") {
+    ctx.beginPath(); ctx.moveTo(-6, -44); ctx.lineTo(6, -44); ctx.stroke();
+  } else if (expression === "worried") {
+    ctx.beginPath(); ctx.arc(0, -42, 5, 0.3, Math.PI - 0.3, false); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(0, -46, 4, 0.1, Math.PI - 0.1, true); ctx.stroke();
   }
+
+  // Speech bubble for shrug
+  if (expression === "shrug") {
+    ctx.fillStyle = "#fffbe6"; ctx.strokeStyle = "#cc1a00"; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.roundRect(20, -110, 100, 40, 10); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(30, -70); ctx.lineTo(20, -60); ctx.lineTo(42, -70); ctx.fill();
+    ctx.fillStyle = "#cc1a00"; ctx.font = "bold 9px 'Orbitron', sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("¯\\_(ツ)_/¯", 70, -96);
+    ctx.fillText("cannons will be", 70, -83);
+    ctx.fillText("cannons!", 70, -70);
+  }
+
   ctx.restore();
 }
 
-/* ─── Draw boardroom background ─── */
-function drawBoardroom(ctx: CanvasRenderingContext2D, W: number, H: number, t: number, shakeX: number, shakeY: number) {
-  ctx.save(); ctx.translate(shakeX, shakeY);
-  const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-  bgGrad.addColorStop(0, "#060812"); bgGrad.addColorStop(0.5, "#0a0e1a"); bgGrad.addColorStop(1, "#060a0e");
-  ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, W, H);
+/* ── Table ── */
+function drawTable(
+  ctx: CanvasRenderingContext2D,
+  cx: number, cy: number,
+  angle: number,
+  landedObjs: FallingObj[],
+  t: number
+) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
 
-  /* floor */
-  ctx.fillStyle = "#0d1220"; ctx.fillRect(0, H - 60, W, 60);
-  ctx.strokeStyle = "rgba(0,100,255,0.15)"; ctx.lineWidth = 1;
-  for (let xi = 0; xi < W; xi += 50) {
-    ctx.beginPath(); ctx.moveTo(xi, H - 60); ctx.lineTo(xi + 30, H); ctx.stroke();
-  }
-  ctx.strokeStyle = "rgba(0,100,255,0.08)"; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, H - 60); ctx.lineTo(W, H - 60); ctx.stroke();
+  // Table wobble decorative lines (wood grain)
+  ctx.fillStyle = "#1a3040";
+  ctx.beginPath(); ctx.roundRect(-TABLE_W / 2, -TABLE_H / 2, TABLE_W, TABLE_H, 6); ctx.fill();
 
-  /* conference table */
-  const tableW = W * 0.55, tableX = (W - tableW) / 2, tableY = H - 75;
-  ctx.fillStyle = "#0a1830";
-  ctx.beginPath(); ctx.roundRect(tableX, tableY, tableW, 18, 6); ctx.fill();
-  ctx.strokeStyle = "rgba(0,247,192,0.35)"; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.roundRect(tableX, tableY, tableW, 18, 6); ctx.stroke();
-  ctx.fillStyle = "rgba(0,247,192,0.06)"; ctx.beginPath(); ctx.roundRect(tableX + 4, tableY + 3, tableW - 8, 6, 3); ctx.fill();
+  ctx.strokeStyle = "rgba(0,247,192,0.4)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.roundRect(-TABLE_W / 2, -TABLE_H / 2, TABLE_W, TABLE_H, 6); ctx.stroke();
 
-  /* stock chart on wall */
-  const chartX = W * 0.62, chartY = H * 0.15, chartW = W * 0.28, chartH = H * 0.3;
-  ctx.fillStyle = "rgba(0,20,40,0.85)"; ctx.strokeStyle = "rgba(0,247,192,0.4)"; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.roundRect(chartX, chartY, chartW, chartH, 6); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = "rgba(0,247,192,0.5)"; ctx.font = "bold 9px 'Orbitron', monospace";
-  ctx.textAlign = "center"; ctx.fillText("STOCKS: ???", chartX + chartW / 2, chartY + 14);
-  ctx.strokeStyle = "#cc1a00"; ctx.lineWidth = 2; ctx.beginPath();
-  const pts = [0, 0.6, 0.4, 0.9, 0.3, 1.0];
-  pts.forEach((p, i) => {
-    const px = chartX + 10 + (i / (pts.length - 1)) * (chartW - 20);
-    const py = chartY + 24 + p * (chartH - 34);
-    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-  }); ctx.stroke();
-  ctx.fillStyle = "#cc1a00"; ctx.font = "bold 11px monospace";
-  ctx.textAlign = "right"; ctx.fillText("📉 -∞%", chartX + chartW - 6, chartY + chartH - 10);
-
-  /* HR WARNING sign */
-  const signX = W * 0.08, signY = H * 0.15;
-  ctx.fillStyle = "#1a0800"; ctx.strokeStyle = "#ff6600"; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.roundRect(signX, signY, 110, 55, 6); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = "#ff6600"; ctx.font = "bold 8px 'Orbitron', monospace"; ctx.textAlign = "center";
-  ctx.fillText("⚠️ HR WARNING", signX + 55, signY + 16);
-  ctx.fillStyle = "#ff9900"; ctx.font = "bold 7px monospace";
-  ctx.fillText("CANNON ACTIVITY DETECTED", signX + 55, signY + 30);
-  ctx.fillText("REPORT TO COMPLIANCE ASAP", signX + 55, signY + 43);
-
-  /* compliance folder stack */
-  const folderColors = ["#1a3a6e", "#1e3d20", "#4a1a00"];
-  for (let i = 0; i < 3; i++) {
-    ctx.fillStyle = folderColors[i]; ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.roundRect(tableX - 80 + i * 4, tableY - 12 - i * 3, 60, 14, 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "5px monospace"; ctx.textAlign = "center";
-    ctx.fillText(["NDA", "HR POLICY", "COMPLIANCE"][i], tableX - 80 + i * 4 + 30, tableY - 4 - i * 3);
+  // Wood grain lines
+  ctx.strokeStyle = "rgba(0,247,192,0.08)"; ctx.lineWidth = 1;
+  for (let xi = -TABLE_W / 2 + 20; xi < TABLE_W / 2; xi += 30) {
+    const wobble = Math.sin(xi * 0.04 + t * 0.03) * 2;
+    ctx.beginPath(); ctx.moveTo(xi, -TABLE_H / 2 + 4 + wobble); ctx.lineTo(xi + 8, TABLE_H / 2 - 4 + wobble); ctx.stroke();
   }
 
-  /* wall neon strips */
-  ctx.strokeStyle = `rgba(0,247,192,${0.06 + Math.sin(t * 0.04) * 0.02})`; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(0, H - 65); ctx.lineTo(W, H - 65); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0, H * 0.55); ctx.lineTo(W * 0.12, H * 0.55); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(W * 0.88, H * 0.55); ctx.lineTo(W, H * 0.55); ctx.stroke();
+  // Table legs (dangling)
+  ctx.fillStyle = "#0d2030"; ctx.strokeStyle = "rgba(0,247,192,0.3)"; ctx.lineWidth = 1.5;
+  for (const legX of [-TABLE_W / 2 + 30, TABLE_W / 2 - 30]) {
+    ctx.beginPath(); ctx.roundRect(legX - 8, TABLE_H / 2, 16, 38, 3); ctx.fill(); ctx.stroke();
+    // foot
+    ctx.beginPath(); ctx.roundRect(legX - 12, TABLE_H / 2 + 34, 24, 6, 2); ctx.fill(); ctx.stroke();
+  }
+
+  // Render landed objects on table surface
+  for (const obj of landedObjs) {
+    if (obj.landed && !obj.slidingOff) {
+      const ox = obj.landedX;
+      ctx.save();
+      ctx.translate(ox, -TABLE_H / 2 - obj.type.h / 2);
+      ctx.rotate(obj.angle);
+      ctx.fillStyle = obj.type.bg; ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(-obj.type.w / 2, -obj.type.h / 2, obj.type.w, obj.type.h, 4); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = obj.type.color; ctx.font = "bold 8px 'Orbitron', monospace";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(obj.label, 0, 0);
+      ctx.restore();
+    }
+  }
+
   ctx.restore();
 }
 
-/* ─── Submit score ─── */
+/* ── Falling object draw ── */
+function drawFallingObj(ctx: CanvasRenderingContext2D, obj: FallingObj) {
+  ctx.save(); ctx.translate(obj.x, obj.y); ctx.rotate(obj.angle);
+  ctx.fillStyle = obj.type.bg; ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(-obj.type.w / 2, -obj.type.h / 2, obj.type.w, obj.type.h, 4); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = obj.type.color; ctx.font = "bold 8px 'Orbitron', monospace";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(obj.type.label, 0, 0);
+  ctx.restore();
+}
+
+/* ── Submit score ── */
 async function submitScore(playerName: string, score: number) {
   await fetch("/api/scores", {
     method: "POST",
@@ -312,44 +299,81 @@ export default function CannonGame() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Physics state
   const G = useRef({
-    px: 200, py: 0, pw: 36, ph: 88,
-    cannons: [] as Cannon[],
-    badPapers: [] as BadPaper[],
-    goodObjs: [] as GoodObj[],
-    papers: [] as Paper[],
-    particles: [] as Particle[],
-    pops: [] as Pop[],
+    // Table
+    tableAngle: 0,
+    tableAngularVel: 0,
+    // "Cannon" jiggle physics - each sphere has horizontal + vertical offset from rest
+    cannonJiggleL: 0, cannonJiggleVelL: 0,
+    cannonJiggleR: 0, cannonJiggleVelR: 0,
+    cannonBounceL: 0, cannonBounceVelL: 0,  // vertical bounce
+    cannonBounceR: 0, cannonBounceVelR: 0,
+    // Player input
+    inputTorque: 0,
+    tiltLeft: false, tiltRight: false,
+    // Falling objects
+    objs: [] as FallingObj[],
+    spawnTimer: 0,
+    // Debris (game over explosion)
+    debris: [] as Debris[],
+    // Score
     score: 0, scoreTimer: 0,
-    speed: 2.8, panicWaveT: 0,
-    cannonSpawnT: 0, badSpawnT: 0, goodSpawnT: 0,
-    moveL: false, moveR: false,
-    playerState: "run" as "run" | "panic" | "facepalm",
-    shakeX: 0, shakeY: 0, shakeMag: 0,
-    t: 0, raf: 0, running: false, touchSX: 0,
+    // State
+    expression: "normal" as "normal" | "worried" | "panic" | "shrug",
+    t: 0, raf: 0, running: false,
+    touchSX: 0,
+    canvasW: 600, canvasH: 500,
+    tableCX: 300, tableCY: 320,
   });
 
   const endGame = useCallback(() => {
-    const g = G.current; g.running = false;
-    const newHs = Math.max(g.score, parseInt(localStorage.getItem(HS_KEY) || "0"));
+    const g = G.current;
+    g.running = false;
+    g.expression = "shrug";
+    const finalScore = Math.floor(g.score);
+    const newHs = Math.max(finalScore, parseInt(localStorage.getItem(HS_KEY) || "0"));
     localStorage.setItem(HS_KEY, String(newHs));
-    setHs(newHs); setScoreDisplay(g.score);
+    setHs(newHs);
+    setScoreDisplay(finalScore);
     setGameOverLine(GAME_OVER_LINES[Math.floor(Math.random() * GAME_OVER_LINES.length)]);
     setSubmitted(false);
-    setTimeout(() => setPhase("over"), 1600);
+
+    // Spawn debris explosion
+    const g2 = g;
+    for (let i = 0; i < 30; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const spd = 3 + Math.random() * 9;
+      g2.debris.push({
+        x: g2.tableCX + (Math.random() - 0.5) * TABLE_W,
+        y: g2.tableCY,
+        vx: Math.cos(a) * spd, vy: Math.sin(a) * spd - 4,
+        angle: Math.random() * Math.PI * 2,
+        spin: (Math.random() - 0.5) * 0.25,
+        life: 120,
+        color: ["#fff", "#22cc55", "#cc1a00", "#ffdd00", "#aaddff"][Math.floor(Math.random() * 5)],
+        label: ["NDA", "$$", "FIRED?", "HR!", "☕"][Math.floor(Math.random() * 5)],
+        size: 16 + Math.random() * 20,
+      });
+    }
+    setTimeout(() => setPhase("over"), 2200);
   }, []);
 
   const startGame = useCallback(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     const g = G.current;
-    g.px = canvas.clientWidth / 2;
-    g.py = canvas.clientHeight - 90;
-    g.cannons = []; g.badPapers = []; g.goodObjs = [];
-    g.papers = []; g.particles = []; g.pops = [];
-    g.score = 0; g.scoreTimer = 0; g.speed = 2.8;
-    g.panicWaveT = 0; g.cannonSpawnT = 0; g.badSpawnT = 0; g.goodSpawnT = 0;
-    g.moveL = false; g.moveR = false; g.playerState = "run";
-    g.shakeX = 0; g.shakeY = 0; g.shakeMag = 0; g.t = 0; g.running = true;
+    g.tableAngle = 0; g.tableAngularVel = (Math.random() - 0.5) * 0.005;
+    g.cannonJiggleL = 0; g.cannonJiggleVelL = 0;
+    g.cannonJiggleR = 0; g.cannonJiggleVelR = 0;
+    g.cannonBounceL = 0; g.cannonBounceVelL = (Math.random() - 0.5) * 2;
+    g.cannonBounceR = 0; g.cannonBounceVelR = (Math.random() - 0.5) * 2;
+    g.inputTorque = 0; g.tiltLeft = false; g.tiltRight = false;
+    g.objs = []; g.debris = [];
+    g.score = 0; g.scoreTimer = 0; g.t = 0;
+    g.expression = "normal"; g.running = true;
+    g.canvasW = canvas.clientWidth; g.canvasH = canvas.clientHeight;
+    g.tableCX = g.canvasW / 2;
+    g.tableCY = g.canvasH * 0.6;
     setScoreDisplay(0); setSubmitted(false); setPhase("playing");
   }, []);
 
@@ -365,267 +389,303 @@ export default function CannonGame() {
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
+
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = canvas.clientWidth * dpr; canvas.height = canvas.clientHeight * dpr;
+      canvas.width = canvas.clientWidth * dpr;
+      canvas.height = canvas.clientHeight * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      G.current.py = canvas.clientHeight - 90;
+      G.current.canvasW = canvas.clientWidth;
+      G.current.canvasH = canvas.clientHeight;
+      G.current.tableCX = canvas.clientWidth / 2;
+      G.current.tableCY = canvas.clientHeight * 0.6;
     };
     resize(); window.addEventListener("resize", resize);
+
+    // Keyboard
     const onKey = (e: KeyboardEvent) => {
       const g = G.current;
-      if (e.code === "ArrowLeft" || e.code === "KeyA") g.moveL = e.type === "keydown";
-      if (e.code === "ArrowRight" || e.code === "KeyD") g.moveR = e.type === "keydown";
+      if (e.code === "ArrowLeft" || e.code === "KeyA") g.tiltLeft = e.type === "keydown";
+      if (e.code === "ArrowRight" || e.code === "KeyD") g.tiltRight = e.type === "keydown";
     };
     window.addEventListener("keydown", onKey); window.addEventListener("keyup", onKey);
-    const onTouchStart = (e: TouchEvent) => { G.current.touchSX = e.touches[0].clientX; };
-    const onTouchMove = (e: TouchEvent) => {
-      e.preventDefault();
-      const dx = e.touches[0].clientX - G.current.touchSX;
-      G.current.px = Math.max(30, Math.min(canvas.clientWidth - 30, G.current.px + dx));
+
+    // Touch
+    const onTouchStart = (e: TouchEvent) => {
       G.current.touchSX = e.touches[0].clientX;
     };
+    const onTouchEnd = (e: TouchEvent) => {
+      const g = G.current; if (!g.running) return;
+      const tx = e.changedTouches[0].clientX;
+      const dx = tx - g.touchSX;
+      if (Math.abs(dx) > 12) {
+        // swipe
+        if (dx < 0) { g.tableAngularVel -= 0.022; }
+        else { g.tableAngularVel += 0.022; }
+      } else {
+        // tap: left or right half
+        if (tx < g.canvasW / 2) g.tableAngularVel -= 0.022;
+        else g.tableAngularVel += 0.022;
+      }
+      kickCannons(g, dx < 0 ? -1 : 1);
+    };
     canvas.addEventListener("touchstart", onTouchStart, { passive: true });
-    canvas.addEventListener("touchmove", onTouchMove, { passive: false });
+    canvas.addEventListener("touchend", onTouchEnd, { passive: true });
+
+    // Mouse click fallback
+    const onClick = (e: MouseEvent) => {
+      const g = G.current; if (!g.running) return;
+      if (e.clientX < g.canvasW / 2) { g.tableAngularVel -= 0.022; kickCannons(g, -1); }
+      else { g.tableAngularVel += 0.022; kickCannons(g, 1); }
+    };
+    canvas.addEventListener("click", onClick);
+
+    const kickCannons = (g: typeof G.current, dir: number) => {
+      g.cannonJiggleVelL += dir * (3 + Math.random() * 4);
+      g.cannonJiggleVelR -= dir * (3 + Math.random() * 4);
+      g.cannonBounceVelL -= 2 + Math.random() * 3;
+      g.cannonBounceVelR -= 2 + Math.random() * 3;
+    };
 
     let lastTime = 0;
     const loop = (time: number) => {
       G.current.raf = requestAnimationFrame(loop);
       const g = G.current;
       const dt = Math.min((time - lastTime) / 16.67, 3); lastTime = time;
-      const W = canvas.clientWidth, H = canvas.clientHeight;
-      if (!g.running) { draw(ctx, W, H, g); return; }
-      g.t += dt; g.scoreTimer += dt;
+      const W = g.canvasW, H = g.canvasH;
 
-      /* score tick every 60 frames */
-      if (g.scoreTimer >= 60) { g.score++; g.scoreTimer = 0; }
-      if (g.speed < 8) g.speed += 0.0025 * dt;
+      if (g.running) {
+        g.t += dt;
+        g.scoreTimer += dt;
+        if (g.scoreTimer >= 60) { g.score += 1; g.scoreTimer = 0; }
 
-      /* player movement */
-      const moveSpeed = 5;
-      if (g.moveL) g.px = Math.max(30, g.px - moveSpeed * dt);
-      if (g.moveR) g.px = Math.min(W - 30, g.px + moveSpeed * dt);
-      if (g.playerState === "run") g.playerState = (g.moveL || g.moveR) ? "run" : "run";
+        // Keyboard tilt
+        if (g.tiltLeft) { g.tableAngularVel -= 0.0012 * dt; kickCannons(g, -0.05 * dt); }
+        if (g.tiltRight) { g.tableAngularVel += 0.0012 * dt; kickCannons(g, 0.05 * dt); }
 
-      /* shake decay */
-      if (g.shakeMag > 0) {
-        g.shakeMag *= 0.85;
-        g.shakeX = (Math.random() - 0.5) * g.shakeMag;
-        g.shakeY = (Math.random() - 0.5) * g.shakeMag;
-        if (g.shakeMag < 0.5) { g.shakeMag = 0; g.shakeX = 0; g.shakeY = 0; }
-      }
+        // Table physics: gravity torque + damping + increasing difficulty
+        const difficultyDrift = 0.00004 * dt * Math.min(g.score * 0.3, 3);
+        g.tableAngularVel += Math.sin(g.tableAngle) * 0.008 * dt; // gravity
+        g.tableAngularVel += (Math.random() - 0.5) * difficultyDrift; // random chaos
+        g.tableAngularVel *= (1 - 0.018 * dt); // damping
+        g.tableAngle += g.tableAngularVel * dt;
 
-      /* panic wave every 15 seconds */
-      g.panicWaveT += dt;
-      if (g.panicWaveT >= 900) {
-        g.panicWaveT = 0;
-        g.pops.push({ x: W / 2, y: H * 0.35, text: "⚠️ BOARDROOM PANIC WAVE!", life: 90, color: "#ff6600" });
-        for (let i = 0; i < 5; i++) {
-          const fromLeft = Math.random() < 0.5;
-          const r = 28 + Math.random() * 12;
-          const startX = fromLeft ? -r - 10 : W + r + 10;
-          const startY = H * 0.15 + Math.random() * H * 0.45;
-          const speed = 4 + Math.random() * 3;
-          g.cannons.push({
-            x: startX, y: startY, vx: fromLeft ? speed : -speed,
-            vy: 1.5 + Math.random() * 2, r, wobble: 0, wobbleV: 0.08 + Math.random() * 0.06,
-            label: "CANNONS", hit: false, kind: "cannon",
+        // Cannon jiggle physics (spring + damping)
+        const K = 0.04, DAMP = 0.88;
+        // Horizontal jiggle: spring toward 0, pushed by tilt
+        const tiltForceL = -g.tableAngle * 8;
+        const tiltForceR = -g.tableAngle * 8;
+        g.cannonJiggleVelL += (-K * g.cannonJiggleL + tiltForceL) * dt * 0.5;
+        g.cannonJiggleVelL *= Math.pow(DAMP, dt);
+        g.cannonJiggleL += g.cannonJiggleVelL * dt;
+        g.cannonJiggleVelR += (-K * g.cannonJiggleR + tiltForceR) * dt * 0.5;
+        g.cannonJiggleVelR *= Math.pow(DAMP, dt);
+        g.cannonJiggleR += g.cannonJiggleVelR * dt;
+
+        // Vertical bounce physics
+        const KB = 0.06, DAMPB = 0.85;
+        g.cannonBounceVelL += -KB * g.cannonBounceL * dt;
+        g.cannonBounceVelL *= Math.pow(DAMPB, dt);
+        g.cannonBounceL += g.cannonBounceVelL * dt;
+        g.cannonBounceVelR += -KB * g.cannonBounceR * dt;
+        g.cannonBounceVelR *= Math.pow(DAMPB, dt);
+        g.cannonBounceR += g.cannonBounceVelR * dt;
+
+        // Extra torque from cannon jiggle (they affect the balance!)
+        const cannonTorque = (g.cannonJiggleL - g.cannonJiggleR) * 0.00008;
+        g.tableAngularVel += cannonTorque * dt;
+
+        // Spawn falling objects
+        g.spawnTimer += dt;
+        const spawnInterval = Math.max(55, 110 - g.score * 1.5);
+        if (g.spawnTimer >= spawnInterval) {
+          g.spawnTimer = 0;
+          const type = OBJECT_TYPES[Math.floor(Math.random() * OBJECT_TYPES.length)];
+          const spawnX = g.tableCX + (Math.random() - 0.5) * TABLE_W * 1.4;
+          g.objs.push({
+            x: spawnX, y: -40, vy: 2.5 + Math.random() * 2, vx: (Math.random() - 0.5) * 1.5,
+            angle: (Math.random() - 0.5) * 0.5, spin: (Math.random() - 0.5) * 0.06,
+            landed: false, landedX: 0, slidingOff: false, type,
           });
         }
-      }
 
-      /* spawn regular cannons */
-      g.cannonSpawnT += dt;
-      if (g.cannonSpawnT >= Math.max(80, 160 - g.score * 0.5)) {
-        g.cannonSpawnT = 0;
-        const r = 24 + Math.random() * 14;
-        g.cannons.push({
-          x: r + Math.random() * (W - r * 2), y: -r - 30,
-          vx: (Math.random() - 0.5) * 2.5, vy: g.speed * 0.75 + Math.random() * 1.5,
-          r, wobble: 0, wobbleV: 0.06 + Math.random() * 0.06,
-          label: "CANNONS", hit: false, kind: "cannon",
-        });
-      }
+        // Update falling objects
+        for (const obj of g.objs) {
+          if (obj.slidingOff) {
+            obj.landedX += Math.sin(g.tableAngle) * 3.5 * dt;
+            obj.y += 2 * dt;
+            obj.angle += 0.05 * dt;
+            continue;
+          }
+          if (obj.landed) {
+            // Slide off if table too tilted
+            if (Math.abs(g.tableAngle) > 0.3) obj.slidingOff = true;
+            continue;
+          }
+          obj.x += obj.vx * dt;
+          obj.y += obj.vy * dt;
+          obj.angle += obj.spin * dt;
 
-      /* spawn bad paper objects */
-      g.badSpawnT += dt;
-      if (g.badSpawnT >= 120) {
-        g.badSpawnT = 0;
-        const label = BAD_LABELS[1 + Math.floor(Math.random() * (BAD_LABELS.length - 1))];
-        g.badPapers.push({
-          x: 60 + Math.random() * (W - 120), y: -30,
-          vy: g.speed * 0.6, angle: (Math.random() - 0.5) * 0.4,
-          spin: (Math.random() - 0.5) * 0.04,
-          w: 80, h: 44, label, hit: false, kind: "bad",
-        });
-      }
-
-      /* spawn good objects */
-      g.goodSpawnT += dt;
-      if (g.goodSpawnT >= 150) {
-        g.goodSpawnT = 0;
-        g.goodObjs.push({
-          x: 60 + Math.random() * (W - 120), y: -30,
-          vy: g.speed * 0.45, bob: Math.random() * Math.PI * 2,
-          label: GOOD_LABELS[Math.floor(Math.random() * GOOD_LABELS.length)],
-          collected: false, kind: "good",
-        });
-      }
-
-      /* update cannons - bounce off walls */
-      for (const c of g.cannons) {
-        c.x += c.vx * dt; c.y += c.vy * dt;
-        c.wobble += c.wobbleV * dt;
-        if (c.x - c.r < 0) { c.x = c.r; c.vx = Math.abs(c.vx); spawnBoing(g, c.x, c.y); }
-        if (c.x + c.r > W) { c.x = W - c.r; c.vx = -Math.abs(c.vx); spawnBoing(g, c.x, c.y); }
-      }
-      for (const p of g.badPapers) { p.y += p.vy * dt; p.angle += p.spin * dt; }
-      for (const o of g.goodObjs) { o.y += o.vy * dt; }
-
-      /* check collisions */
-      if (g.playerState !== "facepalm") {
-        const plx = g.px, ply = g.py - 40;
-        for (const c of g.cannons) {
-          if (c.hit) continue;
-          const dx = c.x - plx, dy = c.y - ply;
-          if (Math.sqrt(dx * dx + dy * dy) < c.r + 22) {
-            c.hit = true;
-            triggerHit(g, W, H, endGame);
-            return;
+          // Check if object hits table surface
+          // Table surface is at tableCY ± TABLE_H/2 in world space, rotated by tableAngle
+          // Simplified: check if obj.y > tableCY - TABLE_H/2 and obj.x is within table width
+          // Transform obj position into table local coordinates
+          const relX = obj.x - g.tableCX;
+          const relY = obj.y - g.tableCY;
+          const localX = relX * Math.cos(-g.tableAngle) - relY * Math.sin(-g.tableAngle);
+          const localY = relX * Math.sin(-g.tableAngle) + relY * Math.cos(-g.tableAngle);
+          if (localX > -TABLE_W / 2 && localX < TABLE_W / 2 && localY > -TABLE_H / 2 - 4 && localY < TABLE_H / 2) {
+            obj.landed = true;
+            obj.landedX = localX;
+            // Apply torque based on where it landed
+            const torque = (localX / (TABLE_W / 2)) * obj.type.weight * 0.005;
+            g.tableAngularVel += torque;
+            // Kick cannons when something lands
+            g.cannonBounceVelL -= 1.5 + Math.random();
+            g.cannonBounceVelR -= 1.5 + Math.random();
           }
         }
-        for (const p of g.badPapers) {
-          if (p.hit) continue;
-          if (Math.abs(p.x - plx) < p.w / 2 + 18 && Math.abs(p.y - ply) < p.h / 2 + 24) {
-            p.hit = true;
-            triggerHit(g, W, H, endGame);
-            return;
-          }
+        g.objs = g.objs.filter(o => o.y < H + 80 && !(o.slidingOff && o.y > H + 20));
+
+        // Expression based on angle
+        const absAngle = Math.abs(g.tableAngle);
+        if (absAngle > MAX_ANGLE * 0.75) g.expression = "panic";
+        else if (absAngle > MAX_ANGLE * 0.45) g.expression = "worried";
+        else g.expression = "normal";
+
+        // Game over check
+        if (Math.abs(g.tableAngle) >= MAX_ANGLE) {
+          g.expression = "shrug";
+          endGame();
         }
-        for (const o of g.goodObjs) {
-          if (o.collected) continue;
-          if (Math.abs(o.x - plx) < 42 && Math.abs(o.y - ply) < 28) {
-            o.collected = true; g.score += 8;
-            g.pops.push({ x: o.x, y: o.y, text: "+8", life: 55, color: "#44ff88" });
-            for (let i = 0; i < 6; i++) {
-              const a = Math.random() * Math.PI * 2;
-              g.particles.push({ x: o.x, y: o.y, vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, r: 4, life: 30, maxLife: 30, color: "#44ff88" });
-            }
-          }
-        }
+      } else {
+        g.t += dt;
+        // Keep cannon jiggling on game over (it's funny)
+        const K = 0.025, DAMP = 0.92;
+        g.cannonJiggleVelL += (-K * g.cannonJiggleL + (Math.random()-0.5)*0.5) * dt;
+        g.cannonJiggleVelL *= Math.pow(DAMP, dt);
+        g.cannonJiggleL += g.cannonJiggleVelL * dt;
+        g.cannonJiggleVelR += (-K * g.cannonJiggleR + (Math.random()-0.5)*0.5) * dt;
+        g.cannonJiggleVelR *= Math.pow(DAMP, dt);
+        g.cannonJiggleR += g.cannonJiggleVelR * dt;
+        g.cannonBounceVelL += (-0.04 * g.cannonBounceL) * dt;
+        g.cannonBounceVelL *= Math.pow(0.88, dt);
+        g.cannonBounceL += g.cannonBounceVelL * dt;
+        g.cannonBounceVelR += (-0.04 * g.cannonBounceR) * dt;
+        g.cannonBounceVelR *= Math.pow(0.88, dt);
+        g.cannonBounceR += g.cannonBounceVelR * dt;
       }
 
-      /* papers physics */
-      for (const p of g.papers) {
-        p.x += p.vx; p.y += p.vy; p.vy += 0.25;
-        p.vx *= 0.98; p.angle += p.spin; p.life--;
+      // Update debris
+      for (const d of g.debris) {
+        d.x += d.vx; d.y += d.vy; d.vy += 0.3; d.vx *= 0.97;
+        d.angle += d.spin; d.life--;
       }
-      for (const p of g.particles) {
-        p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life--;
-      }
-      g.pops.forEach(p => p.life--);
+      g.debris = g.debris.filter(d => d.life > 0);
 
-      /* cleanup */
-      g.cannons = g.cannons.filter(c => !c.hit && c.y < H + 80);
-      g.badPapers = g.badPapers.filter(p => !p.hit && p.y < H + 60);
-      g.goodObjs = g.goodObjs.filter(o => !o.collected && o.y < H + 60);
-      g.papers = g.papers.filter(p => p.life > 0);
-      g.particles = g.particles.filter(p => p.life > 0);
-      g.pops = g.pops.filter(p => p.life > 0);
       draw(ctx, W, H, g);
     };
 
-    const spawnBoing = (g: typeof G.current, x: number, y: number) => {
-      g.pops.push({ x, y, text: "BOING!", life: 30, color: "#ffcc00" });
-      for (let i = 0; i < 4; i++) {
-        const a = Math.random() * Math.PI * 2;
-        g.particles.push({ x, y, vx: Math.cos(a) * 4, vy: Math.sin(a) * 4 - 2, r: 5, life: 25, maxLife: 25, color: "#ffaa00" });
-      }
-    };
-
-    const triggerHit = (g: typeof G.current, W: number, H: number, endGame: () => void) => {
-      g.playerState = "facepalm";
-      g.shakeMag = 28;
-      g.pops.push({ x: W / 2, y: H * 0.32, text: "CANNON INCIDENT ESCALATED!", life: 100, color: "#ff3a3a" });
-      /* spawn flying papers */
-      for (let i = 0; i < 18; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const spd = 3 + Math.random() * 6;
-        g.papers.push({
-          x: g.px, y: g.py - 40,
-          vx: Math.cos(a) * spd, vy: Math.sin(a) * spd - 4,
-          angle: Math.random() * Math.PI * 2, spin: (Math.random() - 0.5) * 0.18,
-          life: 90, w: 22 + Math.random() * 20, h: 14 + Math.random() * 10,
-        });
-      }
-      for (let i = 0; i < 20; i++) {
-        const a = Math.random() * Math.PI * 2; const spd = 2 + Math.random() * 5;
-        g.particles.push({ x: g.px, y: g.py - 40, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd - 3, r: 5 + Math.random() * 8, life: 50, maxLife: 50, color: ["#ff3a3a", "#ffaa00", "#ffdd00"][Math.floor(Math.random() * 3)] });
-      }
-      g.running = false;
-      setTimeout(endGame, 1800);
-    };
-
     const draw = (ctx: CanvasRenderingContext2D, W: number, H: number, g: typeof G.current) => {
-      drawBoardroom(ctx, W, H, g.t, g.shakeX, g.shakeY);
-      ctx.save(); ctx.translate(g.shakeX, g.shakeY);
+      // Background
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+      bgGrad.addColorStop(0, "#06080f"); bgGrad.addColorStop(1, "#0a0a0f");
+      ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, W, H);
 
-      /* flying papers */
-      for (const p of g.papers) {
-        ctx.save(); ctx.globalAlpha = Math.min(1, p.life / 20);
-        ctx.translate(p.x, p.y); ctx.rotate(p.angle);
-        ctx.fillStyle = "#fffbe6"; ctx.strokeStyle = "#ccc"; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.roundRect(-p.w / 2, -p.h / 2, p.w, p.h, 2); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = "#999"; ctx.font = "4px monospace"; ctx.textAlign = "center";
-        ["███████", "██████", "█████"].forEach((l, i) => ctx.fillText(l, 0, -3 + i * 5));
+      // Grid
+      ctx.strokeStyle = "rgba(0,247,192,0.03)"; ctx.lineWidth = 1;
+      for (let x = 0; x < W; x += 50) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+      for (let y = 0; y < H; y += 50) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+      // Boardroom wall decorations
+      // Stock ticker tape
+      ctx.fillStyle = "rgba(0,247,192,0.07)"; ctx.fillRect(0, H * 0.15, W, 28);
+      ctx.font = "bold 9px monospace"; ctx.fillStyle = "rgba(0,247,192,0.3)";
+      ctx.textBaseline = "middle";
+      const tickerStr = "  JPM ▲2.4%  MS ▼1.1%  GS ▲0.8%  CANNONS ▲∞%  HR ▼99%  COMPLIANCE ▲??%  ";
+      const tickerOffset = (g.t * 1.2) % (tickerStr.length * 6.5);
+      ctx.fillText(tickerStr.repeat(3), -tickerOffset, H * 0.15 + 14);
+
+      // "HR WARNING" sign on wall
+      ctx.fillStyle = "rgba(200,26,0,0.15)"; ctx.strokeStyle = "rgba(200,26,0,0.5)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(W * 0.05, H * 0.25, 140, 52, 6); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#ff6622"; ctx.font = "bold 8px 'Orbitron', monospace"; ctx.textAlign = "center";
+      ctx.fillText("⚠️ CANNON ACTIVITY", W * 0.05 + 70, H * 0.25 + 18);
+      ctx.fillText("REPORT TO HR ASAP", W * 0.05 + 70, H * 0.25 + 32);
+      ctx.fillStyle = "#ff4400"; ctx.font = "bold 7px monospace";
+      ctx.fillText("(they're always like this)", W * 0.05 + 70, H * 0.25 + 45);
+
+      // Whiteboard
+      ctx.fillStyle = "rgba(240,240,240,0.06)"; ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(W * 0.68, H * 0.22, 150, 100, 4); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "rgba(0,247,192,0.4)"; ctx.font = "bold 8px 'Orbitron', monospace"; ctx.textAlign = "center";
+      ctx.fillText("Q3 TARGETS:", W * 0.68 + 75, H * 0.22 + 18);
+      ctx.fillStyle = "rgba(200,26,0,0.7)";
+      ctx.font = "7px monospace"; ctx.textAlign = "left";
+      const wbLines = ["• More cannons", "• Keep table level", "• Deny everything", "• ??? ", "• Profit"];
+      wbLines.forEach((l, i) => ctx.fillText(l, W * 0.68 + 10, H * 0.22 + 34 + i * 14));
+
+      // Angle meter (tilt indicator)
+      const meterX = W - 38, meterY = H * 0.35, meterH = 160;
+      ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.strokeStyle = "rgba(0,247,192,0.3)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(meterX - 10, meterY, 20, meterH, 4); ctx.fill(); ctx.stroke();
+      const fillH = (Math.abs(g.tableAngle) / MAX_ANGLE) * (meterH - 6);
+      const dangerColor = g.tableAngle > 0
+        ? `rgba(${Math.floor(fillH / (meterH - 6) * 255)},${Math.floor((1 - fillH / (meterH - 6)) * 200)},0,0.8)`
+        : `rgba(${Math.floor(fillH / (meterH - 6) * 255)},${Math.floor((1 - fillH / (meterH - 6)) * 200)},0,0.8)`;
+      ctx.fillStyle = dangerColor;
+      ctx.beginPath(); ctx.roundRect(meterX - 7, meterY + 3 + (meterH - 6 - fillH), 14, fillH, 3); ctx.fill();
+      ctx.fillStyle = "rgba(0,247,192,0.5)"; ctx.font = "bold 6px 'Orbitron', monospace";
+      ctx.textAlign = "center"; ctx.fillText("TILT", meterX, meterY - 8);
+
+      // Falling objects (not landed)
+      for (const obj of g.objs) if (!obj.landed) drawFallingObj(ctx, obj);
+
+      // Table + landed objects
+      const landedObjs = g.objs.filter(o => o.landed);
+      drawTable(ctx, g.tableCX, g.tableCY, g.tableAngle, landedObjs, g.t);
+
+      // Exec on table
+      const execX = g.tableCX - g.tableAngle * 30;
+      const execY = g.tableCY - TABLE_H / 2 - 8;
+      drawExec(ctx, execX, execY,
+        g.cannonJiggleL, g.cannonJiggleR,
+        g.cannonBounceL, g.cannonBounceR,
+        g.expression, g.tableAngle, g.t);
+
+      // Debris
+      for (const d of g.debris) {
+        ctx.save(); ctx.globalAlpha = Math.min(1, d.life / 30);
+        ctx.translate(d.x, d.y); ctx.rotate(d.angle);
+        ctx.fillStyle = d.color; ctx.font = `bold ${d.size}px monospace`;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(d.label, 0, 0);
         ctx.globalAlpha = 1; ctx.restore();
       }
 
-      /* draw objects */
-      for (const o of g.goodObjs) drawGoodObj(ctx, o, g.t);
-      for (const p of g.badPapers) if (!p.hit) drawBadPaper(ctx, p);
-      for (const c of g.cannons) if (!c.hit) drawCannon(ctx, c, g.t);
-
-      /* particles */
-      for (const p of g.particles) {
-        ctx.globalAlpha = p.life / p.maxLife;
-        ctx.fillStyle = p.color;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
-        ctx.globalAlpha = 1;
+      // Angle warning flash
+      if (Math.abs(g.tableAngle) > MAX_ANGLE * 0.75 && g.running) {
+        ctx.fillStyle = `rgba(255,0,0,${0.06 + Math.sin(g.t * 0.3) * 0.04})`;
+        ctx.fillRect(0, 0, W, H);
       }
 
-      /* player */
-      drawFinanceBro(ctx, g.px, g.py, g.playerState, g.t, g.moveL ? -1 : g.moveR ? 1 : 0);
-
-      /* pops */
-      for (const p of g.pops) {
-        const alpha = Math.min(1, p.life / 15);
-        ctx.globalAlpha = alpha;
-        const isMain = p.text.includes("ESCALATED") || p.text.includes("PANIC");
-        const sz = isMain ? 20 : 14;
-        ctx.font = `bold ${sz}px 'Orbitron', monospace`;
-        ctx.fillStyle = p.color;
-        ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        if (isMain) {
-          ctx.shadowColor = p.color; ctx.shadowBlur = 20;
-          ctx.fillText(p.text, p.x, p.y);
-          ctx.shadowBlur = 0;
-        } else {
-          ctx.fillText(p.text, p.x, p.y - (p.life < 55 ? (55 - p.life) * 0.5 : 0));
-        }
-        ctx.globalAlpha = 1;
-      }
-      ctx.restore();
-
-      /* HUD */
-      ctx.fillStyle = "rgba(0,0,0,0.78)"; ctx.fillRect(0, 0, W, 44);
+      // HUD
+      ctx.fillStyle = "rgba(0,0,0,0.82)"; ctx.fillRect(0, 0, W, 46);
       ctx.strokeStyle = "rgba(0,247,192,0.3)"; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(0, 44); ctx.lineTo(W, 44); ctx.stroke();
-      ctx.font = "bold 13px 'Orbitron', monospace"; ctx.textBaseline = "middle";
-      ctx.fillStyle = NEON; ctx.textAlign = "left";
-      ctx.fillText(`BOARDROOM: ${g.score}s`, 12, 22);
+      ctx.beginPath(); ctx.moveTo(0, 46); ctx.lineTo(W, 46); ctx.stroke();
+      ctx.font = "bold 12px 'Orbitron', monospace"; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+      ctx.fillStyle = NEON; ctx.fillText(`BALANCED: ${Math.floor(g.score)}s`, 12, 23);
       ctx.fillStyle = "#fff"; ctx.textAlign = "right";
-      ctx.fillText(`BEST: ${Math.max(g.score, parseInt(localStorage.getItem(HS_KEY) || "0"))}s`, W - 12, 22);
+      ctx.fillText(`BEST: ${Math.max(Math.floor(g.score), parseInt(localStorage.getItem(HS_KEY)||"0"))}s`, W - 12, 23);
+
+      // Tap hints (fades out after 5s)
+      if (g.t < 300 && g.running) {
+        ctx.globalAlpha = Math.max(0, 1 - g.t / 200);
+        ctx.fillStyle = "rgba(0,247,192,0.7)"; ctx.font = "bold 11px 'Orbitron', monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("← TAP LEFT    TAP RIGHT →", W / 2, H - 30);
+        ctx.globalAlpha = 1;
+      }
     };
 
     G.current.raf = requestAnimationFrame(loop);
@@ -634,30 +694,33 @@ export default function CannonGame() {
       window.removeEventListener("resize", resize);
       window.removeEventListener("keydown", onKey); window.removeEventListener("keyup", onKey);
       canvas.removeEventListener("touchstart", onTouchStart);
-      canvas.removeEventListener("touchmove", onTouchMove);
+      canvas.removeEventListener("touchend", onTouchEnd);
+      canvas.removeEventListener("click", onClick);
     };
   }, [endGame]);
 
   return (
-    <div className="fixed inset-0 bg-[#060812] flex flex-col" style={{ fontFamily: "'Orbitron', monospace" }}>
+    <div className="fixed inset-0 bg-[#06080f] flex flex-col" style={{ fontFamily: "'Orbitron', monospace" }}>
       <canvas ref={canvasRef} className="flex-1 w-full h-full" style={{ display: "block" }} />
 
       {phase === "start" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
           <div className="text-center px-6 max-w-md w-full">
-            <p className="text-[#ff6600] text-xs font-bold tracking-widest mb-1 uppercase">⚠️ Fictional Parody · Not a Real Story</p>
-            <h1 className="text-[#00f7c0] font-black text-3xl mb-1 leading-tight" style={{ textShadow: "0 0 20px #00f7c0" }}>BIG CANNONS:</h1>
-            <h2 className="text-white font-black text-xl mb-4">BOARDROOM ESCAPE</h2>
-            <p className="text-white/70 text-sm mb-2">Dodge the giant slapstick cannons & chaos!</p>
-            <p className="text-[#44ff88]/80 text-sm mb-6">Collect coffee ☕, lawyer shields ⚖️, and NDAs ☂️ for bonus points!</p>
-            <div className="bg-white/5 rounded-xl px-5 py-3 mb-6 text-left text-xs text-white/60 space-y-1">
-              <p>← → or A/D to dodge &nbsp;·&nbsp; swipe on mobile</p>
-              <p>⚠️ Every 15 seconds: <span className="text-[#ff6600] font-bold">BOARDROOM PANIC WAVE</span></p>
+            <div className="text-4xl mb-3">⚖️</div>
+            <h1 className="text-[#00f7c0] font-black text-2xl mb-1 leading-tight" style={{ textShadow: "0 0 20px #00f7c0" }}>
+              CANNON BOARDROOM
+            </h1>
+            <h2 className="text-white font-black text-3xl mb-4">BALANCE</h2>
+            <div className="bg-white/5 border border-[#00f7c0]/20 rounded-2xl p-4 mb-6 text-sm text-white/70 space-y-2">
+              <p>🎯 <span className="text-[#00f7c0] font-bold">Goal:</span> Keep the wobbly table balanced!</p>
+              <p>💥 The cannons jiggle and tip the table — hilarious chaos ensues.</p>
+              <p>📄 Falling office items make it even harder to balance.</p>
+              <p className="text-white/50 text-xs pt-1">Tap left/right · swipe · or ← → keys</p>
             </div>
-            <button onClick={startGame} className="bg-[#00f7c0] text-black font-black text-xl px-12 py-4 rounded-xl w-full hover:bg-white transition-colors">
+            <button onClick={startGame} className="bg-[#00f7c0] text-black font-black text-xl px-12 py-4 rounded-xl w-full hover:bg-white transition-colors mb-3">
               PLAY
             </button>
-            <Link href="/" className="block mt-4 text-[#00f7c0]/60 text-sm hover:text-[#00f7c0]">← Back to Arcade</Link>
+            <Link href="/" className="block text-[#00f7c0]/60 text-sm hover:text-[#00f7c0] text-center">← Back to Arcade</Link>
           </div>
         </div>
       )}
@@ -665,18 +728,21 @@ export default function CannonGame() {
       {phase === "over" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85">
           <div className="text-center px-6 max-w-sm w-full">
-            <p className="text-red-400 font-black text-2xl mb-1">CANNON INCIDENT ESCALATED!</p>
-            <p className="text-[#ff9900]/80 text-sm mb-4 italic">"{gameOverLine}"</p>
+            <div className="text-5xl mb-2">💥</div>
+            <p className="text-red-400 font-black text-2xl mb-1">{gameOverLine}</p>
+            <p className="text-white/60 text-sm mb-4 italic">The cannons kept bouncing. Obviously.</p>
             <p className="text-[#00f7c0] text-4xl font-black mb-1">{scoreDisplay}<span className="text-lg">s</span></p>
-            <p className="text-white/40 text-xs mb-5">Boardroom Survived · Best: {hs}s</p>
+            <p className="text-white/40 text-xs mb-5">Table Balanced · Best: {hs}s</p>
 
             {!submitted ? (
               <div className="mb-4">
                 <p className="text-white/60 text-xs mb-2">Enter your name for the leaderboard:</p>
-                <input type="text" maxLength={24} placeholder="Your name" value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
+                <input
+                  type="text" maxLength={24} placeholder="Your name"
+                  value={playerName} onChange={(e) => setPlayerName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                  className="w-full bg-white/10 border border-[#00f7c0]/40 text-white text-center rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:border-[#00f7c0]" />
+                  className="w-full bg-white/10 border border-[#00f7c0]/40 text-white text-center rounded-lg px-3 py-2 text-sm mb-2 outline-none focus:border-[#00f7c0]"
+                />
                 <button onClick={handleSubmit} disabled={submitting}
                   className="w-full border border-[#00f7c0] text-[#00f7c0] font-bold text-sm py-2 rounded-lg hover:bg-[#00f7c0]/10 transition-colors disabled:opacity-50">
                   {submitting ? "Submitting…" : "📊 Submit Score"}
