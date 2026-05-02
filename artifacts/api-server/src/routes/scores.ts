@@ -6,6 +6,7 @@ import { desc, eq, sql } from "drizzle-orm";
 const router = Router();
 
 router.post("/scores", async (req, res) => {
+  res.set("Cache-Control", "no-store");
   const parsed = insertScoreSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid score data", details: parsed.error.issues });
@@ -16,6 +17,7 @@ router.post("/scores", async (req, res) => {
 });
 
 router.get("/scores/leaderboard", async (req, res) => {
+  res.set("Cache-Control", "no-store");
   const game = req.query.game as string | undefined;
   const validGames = ["ww11", "cannon", "alien"];
 
@@ -41,6 +43,7 @@ router.get("/scores/leaderboard", async (req, res) => {
 });
 
 router.get("/scores/all-leaderboard", async (_req, res) => {
+  res.set("Cache-Control", "no-store");
   const games = ["ww11", "cannon", "alien"];
   const result: Record<string, { playerName: string; score: number }[]> = {};
 

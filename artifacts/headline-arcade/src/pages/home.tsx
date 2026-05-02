@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -100,18 +100,39 @@ type BoardData = Record<string, BoardEntry[]>;
 function Leaderboard() {
   const [data, setData] = useState<BoardData>({});
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeGame, setActiveGame] = useState<"ww11" | "cannon" | "alien">("ww11");
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  useEffect(() => {
-    fetch("/api/scores/all-leaderboard")
-      .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
+  const fetchScores = useCallback(async (isManual = false) => {
+    if (isManual) setRefreshing(true);
+    try {
+      const r = await fetch("/api/scores/all-leaderboard", { cache: "no-store" });
+      const d = await r.json();
+      setData(d);
+      setLastUpdated(new Date());
+    } catch {
+      /* silent */
+    } finally {
+      setLoading(false);
+      if (isManual) setRefreshing(false);
+    }
   }, []);
 
-  const rows: BoardEntry[] = data[activeGame] ?? [];
+  useEffect(() => {
+    fetchScores();
+    const interval = setInterval(() => fetchScores(), 30_000);
+    return () => clearInterval(interval);
+  }, [fetchScores]);
 
+  const rows: BoardEntry[] = data[activeGame] ?? [];
   const medals = ["🥇", "🥈", "🥉"];
+
+  const timeAgo = lastUpdated
+    ? Math.floor((Date.now() - lastUpdated.getTime()) / 1000) < 5
+      ? "just now"
+      : `${Math.floor((Date.now() - lastUpdated.getTime()) / 1000)}s ago`
+    : null;
 
   return (
     <section className="px-4 pb-16 max-w-3xl mx-auto">
@@ -119,6 +140,23 @@ function Leaderboard() {
         <Trophy size={18} className="text-primary" style={{ filter: "drop-shadow(0 0 6px #00f7c0)" }} />
         <h3 className="font-display font-bold text-white text-xl tracking-wide">LEADERBOARD</h3>
         <div className="flex-1 h-px bg-gradient-to-r from-primary/40 to-transparent" />
+        {timeAgo && (
+          <span className="text-muted-foreground text-xs hidden sm:block">Updated {timeAgo}</span>
+        )}
+        <button
+          onClick={() => fetchScores(true)}
+          disabled={refreshing}
+          className="text-primary/70 hover:text-primary transition-colors disabled:opacity-40"
+          title="Refresh leaderboard"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            style={{ animation: refreshing ? "spin 0.7s linear infinite" : "none" }}>
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+            <path d="M21 3v5h-5"/>
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+            <path d="M8 16H3v5"/>
+          </svg>
+        </button>
       </div>
 
       {/* Game tabs */}
@@ -139,11 +177,10 @@ function Leaderboard() {
       </div>
 
       <div className="bg-card border border-primary/20 rounded-2xl overflow-hidden">
-        {/* header */}
         <div className="grid grid-cols-[32px_1fr_80px] px-4 py-2 border-b border-primary/15 bg-black/30">
           <span className="text-muted-foreground text-xs font-bold">#</span>
           <span className="text-muted-foreground text-xs font-bold">PLAYER</span>
-          <span className="text-muted-foreground text-xs font-bold text-right">{activeGame === "alien" ? "FILES" : "SCORE"}</span>
+          <span className="text-muted-foreground text-xs font-bold text-right">{activeGame === "alien" ? "FILES" : activeGame === "cannon" ? "SECONDS" : "SCORE"}</span>
         </div>
 
         {loading ? (
@@ -159,17 +196,17 @@ function Leaderboard() {
               key={i}
               className={`grid grid-cols-[32px_1fr_80px] px-4 py-2.5 items-center border-b border-primary/08 last:border-0 ${i === 0 ? "bg-primary/5" : ""}`}
             >
-              <span className="text-sm">{medals[i] ?? <span className="text-muted-foreground font-mono text-xs">{i + 1}</span>}</span>
+              <span className="text-sm">{i < 3 ? medals[i] : <span className="text-muted-foreground font-mono text-xs">{i + 1}</span>}</span>
               <span className="text-white font-bold text-sm truncate">{r.playerName}</span>
               <span className={`text-right font-display font-black text-sm ${i === 0 ? "text-primary" : "text-white/80"}`}
                 style={i === 0 ? { textShadow: "0 0 8px #00f7c0" } : {}}>
-                {r.score}
+                {r.score}{activeGame === "cannon" ? "s" : ""}
               </span>
             </div>
           ))
         )}
       </div>
-      <p className="text-center text-muted-foreground text-xs mt-3">Submit your score after playing to appear here!</p>
+      <p className="text-center text-muted-foreground text-xs mt-3">Submit your score after playing to appear here · auto-refreshes every 30s</p>
     </section>
   );
 }
