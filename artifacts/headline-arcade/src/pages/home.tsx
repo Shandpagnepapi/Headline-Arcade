@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { toast } from "sonner";
-import { SiKofi, SiPaypal, SiBuymeacoffee } from "react-icons/si";
-import { Gamepad2, Zap, Share2, Trophy } from "lucide-react";
+import { SiKofi, SiBuymeacoffee } from "react-icons/si";
+import { Copy, ExternalLink, Gamepad2, Share2, Trophy, Wallet, Zap } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -40,9 +40,62 @@ const games = [
 
 const GAME_LABELS: Record<string, string> = {
   ww11: "World War 11",
-  cannon: "Cannon Baron",
+  cannon: "Cannon Boardroom",
   alien: "Flappy Alien Files",
 };
+
+type GameMeta = typeof games[number];
+
+const supportOptions = [
+  {
+    key: "crypto",
+    label: "Crypto Tip Jar",
+    note: "Use a payment link or public wallet address.",
+    href: import.meta.env.VITE_SUPPORT_CRYPTO_URL,
+    icon: <Wallet size={17} />,
+    accent: "text-[#8cf7ff] border-[#8cf7ff]/30 bg-[#8cf7ff]/10 hover:bg-[#8cf7ff]/15",
+  },
+  {
+    key: "kofi",
+    label: "Ko-fi",
+    note: "Simple creator tips through Stripe or PayPal.",
+    href: import.meta.env.VITE_SUPPORT_KOFI_URL,
+    icon: <SiKofi />,
+    accent: "text-[#29abe0] border-[#29abe0]/30 bg-[#29abe0]/10 hover:bg-[#29abe0]/20",
+  },
+  {
+    key: "bmac",
+    label: "Buy Me a Coffee",
+    note: "Familiar one-time support page for players.",
+    href: import.meta.env.VITE_SUPPORT_BMAC_URL,
+    icon: <SiBuymeacoffee />,
+    accent: "text-[#e8c900] border-[#FFDD00]/30 bg-[#FFDD00]/10 hover:bg-[#FFDD00]/20",
+  },
+];
+
+const cryptoAddress = import.meta.env.VITE_SUPPORT_CRYPTO_ADDRESS;
+const cryptoLabel = import.meta.env.VITE_SUPPORT_CRYPTO_LABEL || "Wallet";
+
+async function copyText(text: string) {
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const el = document.createElement("textarea");
+  el.value = text;
+  el.setAttribute("readonly", "");
+  el.style.position = "fixed";
+  el.style.left = "-9999px";
+  document.body.appendChild(el);
+  el.select();
+  const copied = document.execCommand("copy");
+  document.body.removeChild(el);
+
+  if (!copied) {
+    throw new Error("Clipboard copy failed");
+  }
+}
 
 /* ── Newspaper page component ── */
 function NewspaperPage({
@@ -94,6 +147,118 @@ function NewspaperPage({
 }
 
 /* ── Leaderboard section ── */
+function WW11Thumbnail() {
+  return (
+    <div
+      role="img"
+      aria-label="World War 11 thumbnail showing fake WW11 labels falling toward a correct WWII pickup"
+      className="relative w-full h-full overflow-hidden bg-[#101017] group-hover:scale-105 transition-transform duration-500"
+    >
+      <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 50% 35%, rgba(0,247,192,0.18), transparent 45%), linear-gradient(180deg, #15131f 0%, #07080d 100%)" }} />
+      <div className="absolute inset-x-0 top-0 h-9 bg-black/55 border-b border-primary/25" />
+      <div className="absolute left-3 top-3 right-3 flex items-center justify-between">
+        <span className="text-[9px] font-display font-black text-primary tracking-widest">HISTORY CHECK</span>
+        <span className="text-[9px] font-display font-black text-red-400 tracking-widest">WW11?</span>
+      </div>
+
+      <div className="absolute left-[10%] top-[25%] w-[31%] h-[30%] rounded-md border border-red-400/70 bg-red-950/80 rotate-[-13deg] shadow-[0_0_18px_rgba(248,113,113,0.25)] flex items-center justify-center">
+        <span className="font-display font-black text-red-200 text-[clamp(16px,4vw,28px)] leading-none">WW 11</span>
+      </div>
+      <div className="absolute right-[13%] top-[18%] w-[24%] h-[23%] rounded-md border border-red-400/60 bg-black/70 rotate-[15deg] flex items-center justify-center">
+        <span className="font-display font-black text-red-300 text-[clamp(12px,3vw,20px)] leading-none">XI!</span>
+      </div>
+      <div className="absolute right-[6%] bottom-[18%] w-[28%] h-[26%] rounded-md border border-red-500/50 bg-red-950/60 rotate-[8deg] flex items-center justify-center">
+        <span className="font-display font-black text-red-200 text-[clamp(10px,2.7vw,18px)] leading-tight text-center">11th<br />WAR</span>
+      </div>
+
+      <div className="absolute left-1/2 bottom-[18%] -translate-x-1/2 w-[39%] h-[22%] rounded-lg border border-emerald-300 bg-emerald-400 text-black shadow-[0_0_24px_rgba(52,211,153,0.45)] flex items-center justify-center -rotate-3">
+        <span className="font-display font-black text-[clamp(15px,4vw,27px)] leading-none">WWII</span>
+      </div>
+      <div className="absolute left-[18%] bottom-[11%] w-[64%] h-2 rounded-full bg-primary/25 blur-sm" />
+      <div className="absolute left-[22%] bottom-[7%] h-2 w-[18%] rounded-full bg-primary/45" />
+      <div className="absolute right-[24%] bottom-[7%] h-2 w-[18%] rounded-full bg-primary/45" />
+
+      {Array.from({ length: 9 }).map((_, i) => (
+        <div
+          key={i}
+          className="absolute w-px bg-primary/20"
+          style={{ height: `${24 + (i % 3) * 16}px`, left: `${8 + i * 11}%`, top: `${18 + (i % 4) * 10}%` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CannonThumbnail() {
+  return (
+    <div
+      role="img"
+      aria-label="Cannon Boardroom Balance thumbnail showing an office table with falling coffee, phone, and NDA"
+      className="relative w-full h-full overflow-hidden bg-[#09111d] group-hover:scale-105 transition-transform duration-500"
+    >
+      <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, #0d1724 0%, #07090f 68%, #05070a 100%)" }} />
+      <div className="absolute inset-x-0 bottom-0 h-[34%]" style={{ background: "linear-gradient(180deg, rgba(0,247,192,0.04), rgba(0,247,192,0.01))" }} />
+      <div className="absolute left-1/2 bottom-0 h-[34%] w-px bg-primary/25" />
+      {[-3, -2, -1, 1, 2, 3].map((line) => (
+        <div
+          key={line}
+          className="absolute bottom-0 left-1/2 h-[37%] w-px origin-bottom bg-primary/12"
+          style={{ transform: `rotate(${line * 13}deg)` }}
+        />
+      ))}
+
+      <div className="absolute left-[10%] top-[16%] w-[23%] h-[31%] rounded border border-sky-300/25 bg-sky-700/15">
+        <div className="absolute bottom-0 left-[12%] w-[16%] h-[28%] bg-black/35" />
+        <div className="absolute bottom-0 left-[40%] w-[14%] h-[44%] bg-black/35" />
+        <div className="absolute bottom-0 right-[13%] w-[16%] h-[35%] bg-black/35" />
+      </div>
+      <div className="absolute left-[38%] top-[14%] w-[23%] h-[31%] rounded border border-sky-300/25 bg-sky-700/15" />
+      <div className="absolute right-[11%] top-[16%] w-[23%] h-[31%] rounded border border-sky-300/25 bg-sky-700/15" />
+
+      <div className="absolute left-[12%] bottom-[26%] w-[76%] h-[10%] rounded-md border border-primary bg-[#173747] shadow-[0_0_18px_rgba(0,247,192,0.28)] rotate-[-2deg]" />
+      <div className="absolute left-[17%] bottom-[16%] w-[8%] h-[12%] rounded-b bg-[#0e2b37] border border-primary/40" />
+      <div className="absolute right-[17%] bottom-[16%] w-[8%] h-[12%] rounded-b bg-[#0e2b37] border border-primary/40" />
+
+      <div className="absolute left-[43%] bottom-[29%] w-[14%] h-[27%]">
+        <div className="absolute left-1/2 top-[10%] -translate-x-1/2 w-[46%] aspect-square rounded-full bg-[#f0bd8b]" />
+        <div className="absolute left-[18%] top-0 w-[64%] h-[27%] rounded-full bg-[#5b3216]" />
+        <div className="absolute left-[22%] top-[26%] w-[56%] h-[48%] rounded-t-lg bg-white" />
+        <div className="absolute left-[13%] top-[30%] w-[27%] h-[45%] bg-[#111318] rounded-l-md" />
+        <div className="absolute right-[13%] top-[30%] w-[27%] h-[45%] bg-[#111318] rounded-r-md" />
+        <div className="absolute left-[23%] top-[72%] w-[54%] h-[22%] rounded-b-md bg-[#111318]" />
+      </div>
+
+      <div className="absolute left-[14%] top-[8%] w-[15%] h-[25%] rounded-md bg-[#dfe7ed] border border-white/70 rotate-[-15deg]">
+        <div className="absolute left-[18%] top-[18%] right-[18%] h-[13%] rounded-full bg-[#3a1e12]" />
+        <div className="absolute right-[-20%] top-[35%] w-[28%] h-[34%] rounded-full border-2 border-[#dfe7ed]" />
+      </div>
+      <div className="absolute right-[19%] top-[5%] w-[16%] h-[32%] rounded-md bg-[#070a12] border border-slate-400 rotate-[13deg]">
+        <div className="absolute inset-[12%] rounded-sm bg-gradient-to-b from-blue-500 to-[#070a12]" />
+        <div className="absolute left-[32%] right-[32%] bottom-[12%] h-px bg-white/70" />
+      </div>
+      <div className="absolute left-[58%] top-[18%] w-[23%] h-[30%] rounded-sm bg-[#f1ead8] border border-stone-300 rotate-[9deg] shadow-[0_0_16px_rgba(255,255,255,0.16)]">
+        <div className="absolute inset-x-[12%] top-[18%] h-px bg-slate-600/60" />
+        <div className="absolute inset-x-[12%] top-[32%] h-px bg-slate-600/35" />
+        <div className="absolute inset-x-[12%] top-[46%] h-px bg-slate-600/35" />
+        <div className="absolute left-[20%] right-[20%] bottom-[18%] border-2 border-red-600 rounded-sm text-red-600 font-display font-black text-[clamp(8px,2vw,15px)] leading-none flex items-center justify-center -rotate-6">NDA</div>
+      </div>
+    </div>
+  );
+}
+
+function GameThumbnail({ game }: { game: GameMeta }) {
+  if (game.gameKey === "ww11") return <WW11Thumbnail />;
+  if (game.gameKey === "cannon") return <CannonThumbnail />;
+
+  return (
+    <img
+      src={game.img}
+      alt={game.title}
+      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+    />
+  );
+}
+
 type BoardEntry = { playerName: string; score: number };
 type BoardData = Record<string, BoardEntry[]>;
 
@@ -101,6 +266,7 @@ function Leaderboard() {
   const [data, setData] = useState<BoardData>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
   const [activeGame, setActiveGame] = useState<"ww11" | "cannon" | "alien">("ww11");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -108,11 +274,13 @@ function Leaderboard() {
     if (isManual) setRefreshing(true);
     try {
       const r = await fetch("/api/scores/all-leaderboard", { cache: "no-store" });
+      if (!r.ok) throw new Error(`Leaderboard request failed: ${r.status}`);
       const d = await r.json();
       setData(d);
       setLastUpdated(new Date());
+      setError(false);
     } catch {
-      /* silent */
+      setError(true);
     } finally {
       setLoading(false);
       if (isManual) setRefreshing(false);
@@ -135,7 +303,7 @@ function Leaderboard() {
     : null;
 
   return (
-    <section className="px-4 pb-16 max-w-3xl mx-auto">
+    <section id="leaderboard" className="px-4 pb-16 max-w-3xl mx-auto scroll-mt-16">
       <div className="flex items-center gap-3 mb-4">
         <Trophy size={18} className="text-primary" style={{ filter: "drop-shadow(0 0 6px #00f7c0)" }} />
         <h3 className="font-display font-bold text-white text-xl tracking-wide">LEADERBOARD</h3>
@@ -185,6 +353,11 @@ function Leaderboard() {
 
         {loading ? (
           <div className="py-10 text-center text-muted-foreground text-sm animate-pulse">Loading scores…</div>
+        ) : error && rows.length === 0 ? (
+          <div className="py-10 text-center px-4">
+            <p className="text-muted-foreground text-sm">Leaderboard is offline right now.</p>
+            <p className="text-primary/60 text-xs mt-1">Local scores still work; connect the API to publish global scores.</p>
+          </div>
         ) : rows.length === 0 ? (
           <div className="py-10 text-center">
             <p className="text-muted-foreground text-sm">No scores yet.</p>
@@ -222,10 +395,54 @@ export default function Home() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const handleShare = () => {
-    navigator.clipboard
-      .writeText("Play Headline Arcade — today's wild headlines turned into silly 60-second games! " + window.location.href)
-      .then(() => toast("Link copied!", { description: "Share the chaos with someone who needs a break." }));
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}${BASE || ""}/`;
+    const shareData: ShareData = {
+      title: "Headline Arcade",
+      text: "Play tiny arcade games built from the weirdest imaginary headlines.",
+      url: shareUrl,
+    };
+
+    try {
+      if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
+        await navigator.share(shareData);
+        return;
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+    }
+
+    try {
+      await copyText(`${shareData.text} ${shareData.url}`);
+      toast({
+        title: "Link copied",
+        description: "Native sharing was unavailable, so the arcade link is on your clipboard.",
+      });
+    } catch {
+      toast({
+        title: "Share failed",
+        description: "Your browser blocked sharing. Copy the address bar as a fallback.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCopyWallet = async () => {
+    if (!cryptoAddress) return;
+
+    try {
+      await copyText(cryptoAddress);
+      toast({
+        title: "Wallet copied",
+        description: `${cryptoLabel} address copied to your clipboard.`,
+      });
+    } catch {
+      toast({
+        title: "Copy failed",
+        description: "Your browser blocked clipboard access.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -263,10 +480,18 @@ export default function Home() {
 
       {/* ── STICKY NAV ── */}
       <nav ref={navRef} className="sticky top-0 z-50 w-full bg-background/90 backdrop-blur-md border-b border-primary/15 transition-shadow duration-300">
-        <div className="max-w-4xl mx-auto px-5 h-12 flex items-center justify-end">
-          <button onClick={handleShare} data-testid="button-share" className="flex items-center gap-2 border border-primary/35 text-primary px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest hover:bg-primary hover:text-background transition-all">
-            <Share2 size={13} /> Share
-          </button>
+        <div className="max-w-4xl mx-auto px-5 h-12 flex items-center justify-between gap-3">
+          <Link href="/" className="font-display text-primary text-sm font-black tracking-widest">
+            HEADLINE ARCADE
+          </Link>
+          <div className="flex items-center gap-2">
+            <a href="#donate" className="hidden sm:inline-flex text-muted-foreground hover:text-primary text-xs font-semibold uppercase tracking-widest transition-colors">
+              Support
+            </a>
+            <button onClick={handleShare} data-testid="button-share" aria-label="Share Headline Arcade" className="flex items-center gap-2 border border-primary/35 text-primary px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest hover:bg-primary hover:text-background transition-all">
+              <Share2 size={13} /> Share
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -277,7 +502,7 @@ export default function Home() {
             <motion.div key={game.id} initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-30px" }} transition={{ delay: i * 0.07 }}
               data-testid={`card-game-${game.id}`} className="bg-card border border-primary/20 rounded-2xl overflow-hidden hover:border-primary/55 transition-colors group flex flex-col">
               <div className="relative w-full overflow-hidden" style={{ aspectRatio: "4/3" }}>
-                <img src={game.img} alt={game.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <GameThumbnail game={game} />
                 {!game.live && (
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                     <span className="text-primary/70 font-display font-bold text-xs tracking-widest uppercase">Coming Soon</span>
@@ -301,13 +526,50 @@ export default function Home() {
       <Leaderboard />
 
       {/* ── DONATE ── */}
-      <section id="donate" className="border-t border-primary/15 bg-black/50 py-5 px-4">
-        <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-white font-bold text-sm">Keep the Arcade Running</p>
-          <div className="flex items-center gap-2 flex-wrap justify-center">
-            <a href="#" data-testid="button-kofi" className="flex items-center gap-1.5 bg-[#29abe0]/10 text-[#29abe0] border border-[#29abe0]/30 px-4 py-2 rounded-lg font-bold text-xs hover:bg-[#29abe0]/20 transition-all"><SiKofi /> ko-fi</a>
-            <a href="#" data-testid="button-paypal" className="flex items-center gap-1.5 bg-[#0070ba]/10 text-[#5ba4e0] border border-[#0070ba]/30 px-4 py-2 rounded-lg font-bold text-xs hover:bg-[#0070ba]/20 transition-all"><SiPaypal /> PayPal</a>
-            <a href="#" data-testid="button-bmac" className="flex items-center gap-1.5 bg-[#FFDD00]/10 text-[#e8c900] border border-[#FFDD00]/30 px-4 py-2 rounded-lg font-bold text-xs hover:bg-[#FFDD00]/20 transition-all"><SiBuymeacoffee /> Buy Me a Coffee</a>
+      <section id="donate" className="border-t border-primary/15 bg-black/50 py-8 px-4 scroll-mt-16">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-4">
+            <div>
+              <p className="text-white font-display font-black text-lg tracking-wide">KEEP THE ARCADE RUNNING</p>
+              <p className="text-muted-foreground text-xs mt-1">Private-friendly support links. No personal Venmo required.</p>
+            </div>
+            {cryptoAddress && (
+              <button
+                onClick={handleCopyWallet}
+                className="inline-flex items-center justify-center gap-2 border border-primary/35 text-primary px-3 py-2 rounded-lg text-xs font-bold hover:bg-primary hover:text-background transition-all"
+              >
+                <Copy size={13} /> Copy {cryptoLabel}
+              </button>
+            )}
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-3">
+            {supportOptions.map((option) => (
+              <div key={option.key} className="border border-primary/15 bg-card/80 rounded-lg p-3">
+                <div className="flex items-center gap-2 text-white font-bold text-sm">
+                  <span className={`inline-flex items-center justify-center w-8 h-8 rounded-md border ${option.accent}`}>
+                    {option.icon}
+                  </span>
+                  {option.label}
+                </div>
+                <p className="text-muted-foreground text-xs mt-2 min-h-8">{option.note}</p>
+                {option.href ? (
+                  <a
+                    href={option.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    data-testid={`button-support-${option.key}`}
+                    className={`mt-3 inline-flex items-center justify-center gap-1.5 w-full rounded-lg border px-3 py-2 text-xs font-bold transition-all ${option.accent}`}
+                  >
+                    Open <ExternalLink size={12} />
+                  </a>
+                ) : (
+                  <div className="mt-3 inline-flex items-center justify-center w-full rounded-lg border border-white/10 text-white/35 px-3 py-2 text-xs font-bold">
+                    Setup needed
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </section>
