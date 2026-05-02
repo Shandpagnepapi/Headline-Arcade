@@ -1,0 +1,152 @@
+You are an expert React + Vite + Canvas developer working inside an existing "Headline Arcade" React app. Inspect the current project structure first, then add three complete mini-games using the app’s existing style and routing patterns.
+
+Use the same dark neon style:
+- #0a0a0a background
+- #00f7c0 neon cyan accents
+- Tailwind classes
+- mobile-first layout
+- no external image assets
+- Canvas-drawn cartoon art only
+
+Create these exact files:
+1. src/pages/IlhanNumberDodge.jsx
+2. src/pages/CannonBoardroomDodge.jsx
+3. src/pages/FlappyAlienFiles.jsx
+
+Update App.jsx so the games are reachable at:
+- /games/ilhan-number-dodge
+- /games/cannon-boardroom-dodge
+- /games/flappy-alien-files
+
+Also update the homepage/game grid file, likely Home.jsx, so it shows 4 cards:
+1. Ilhan’s Number Dodge
+2. Cannon Boardroom Dodge
+3. Flappy Alien Files
+4. Coming Soon card titled: "More Wild Headlines Coming..."
+
+Each active card should link to the correct route with React Router. If the homepage has a main "PLAY" button, make it launch the featured game: /games/ilhan-number-dodge. Do not add login, tokens, paywalls, modals, or extra screens.
+
+GLOBAL GAME REQUIREMENTS:
+- Full-screen responsive Canvas game area.
+- Use requestAnimationFrame.
+- Target smooth 60fps.
+- Use devicePixelRatio scaling so canvas looks sharp on mobile.
+- Clean up animation frames, event listeners, timers, and touch handlers on unmount.
+- Prevent unwanted page scrolling while swiping/tapping inside the game.
+- Top bar must show:
+  - game title
+  - live score
+  - high score
+- Store high score in localStorage with a unique key per game.
+- Game over screen must include neon buttons:
+  - PLAY AGAIN
+  - BACK TO HOME
+- Each game page must show one very short instruction line at the top in large text.
+- Support mobile touch and desktop keyboard controls.
+- All art must be cute, exaggerated, light-hearted cartoon parody drawn with Canvas only.
+- Never use real photos.
+- Avoid hateful, sexual, or mean-spirited content. Keep everything silly and arcade-like.
+
+GAME 1: Ilhan’s Number Dodge
+Type: endless dodge/side-scroller style
+
+Character:
+- Cute cartoon Ilhan-style public-figure parody.
+- Colorful hijab, big glasses, tiny microphone.
+- Important: the joke is the "World War 11" mix-up, not her religion, ethnicity, or identity.
+- Big head, simple shapes, silly expression.
+
+Controls:
+- Left/right arrow keys.
+- Swipe left/right on mobile.
+
+Gameplay:
+- Player runs in place near the bottom.
+- Falling objects:
+  - Bad red objects: "11" and "World War 11"
+  - Good green objects: "II" and "World War II"
+- Avoid bad objects.
+- Collect or touch good objects for bonus points.
+- Hit bad "11" object:
+  - show big speech bubble: "WORLD WAR ELEVEN?!"
+  - facepalm animation
+  - game over
+
+Score:
+- Label score as: "Correct Wars Survived"
+- Game over text: "World War Eleven strikes again!"
+
+GAME 2: Cannon Boardroom Dodge
+Type: endless dodge/side-scroller style
+
+Character:
+- Cute fictional Wall Street boardroom exec inspired by an absurd fake viral headline.
+- Power suit, big hair, dramatic CEO energy, shocked facial expressions.
+- Ridiculously oversized bouncy cartoon "cannons" as the central visual gag.
+- The cannons should be silly, round, exaggerated, wobbling slapstick props with tiny barrels and boing physics.
+- Keep the joke subliminal and cartoony, not explicit.
+- Do not use real names, real photos, or make it look like a specific real JP Morgan employee.
+
+Controls:
+- Left/right arrow keys.
+- Swipe left/right on mobile.
+
+Gameplay:
+- Player moves along the bottom.
+- Falling objects:
+  - Bad red objects: giant "CANNONS"
+  - Good green objects: "HR Reports" and "Coffee"
+- Hit cannon:
+  - show "BOOM!"
+  - extra bouncy cannon wobble animation
+  - surprised facepalm
+  - game over
+
+Score:
+- Label score as: "Boardroom Survived"
+- Game over text: "Those Cannons Were WAY Too Big!"
+
+GAME 3: Flappy Alien Files
+Type: Flappy Bird style
+
+Character:
+- Cute cartoon Trump-style public-figure parody.
+- Big orange hair, red tie.
+- Flying a tiny UFO upward.
+- Silly, non-hateful political parody.
+
+Controls:
+- Tap, Space, or click to flap upward.
+
+Gameplay:
+- Gravity pulls player down.
+- Obstacles scroll from right to left.
+- Obstacles:
+  - "CLASSIFIED" stamps
+  - redacted document blocks
+- Collect glowing yellow "ALIEN FILES" folders for points.
+- Crash:
+  - show "DISCLOSURE DENIED!"
+  - Trump shrug pose
+  - tiny alien waving behind him
+  - game over
+
+Score:
+- Label score as: "Files Declassified"
+- Include funny game over screen.
+
+IMPLEMENTATION DETAILS:
+- Keep each game self-contained in its own JSX file.
+- Use React hooks only.
+- Do not introduce new dependencies unless absolutely necessary.
+- Use Canvas APIs for characters, obstacles, score effects, particles, and animations.
+- Use Tailwind for page layout, buttons, top bars, and wrappers.
+- Make buttons large and easy to tap on mobile.
+- Make collision forgiving enough to feel fun, not frustrating.
+- Add comments only where helpful.
+- Do not break existing routes or existing homepage content.
+
+At the end, output:
+1. A brief summary of what changed.
+2. The exact App.jsx route snippet that was added or replaced.
+3. Any assumptions made about the existing project structure.

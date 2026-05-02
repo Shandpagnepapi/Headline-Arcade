@@ -22,14 +22,14 @@ const games = [
   },
   {
     id: "game3",
-    title: "Coming Soon",
-    img: `${BASE}/thumbs/soon1.png`,
-    live: false,
+    title: "Flappy Alien Files",
+    img: `${BASE}/thumbs/aliensoon.png`,
+    live: true,
   },
   {
     id: "game4",
-    title: "Alien Debrief",
-    img: `${BASE}/thumbs/aliensoon.png`,
+    title: "More Coming Soon...",
+    img: `${BASE}/thumbs/soon1.png`,
     live: false,
   },
 ];

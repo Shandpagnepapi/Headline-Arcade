@@ -6,6 +6,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import GamePage from "@/pages/game";
+import WW11Game from "@/pages/ww11-game";
+import CannonGame from "@/pages/cannon-game";
+import AlienGame from "@/pages/alien-game";
 
 const queryClient = new QueryClient();
 
@@ -13,6 +16,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/games/game1" component={WW11Game} />
+      <Route path="/games/game2" component={CannonGame} />
+      <Route path="/games/game3" component={AlienGame} />
       <Route path="/games/:id" component={GamePage} />
       <Route component={NotFound} />
     </Switch>
