@@ -18,8 +18,8 @@ const games = [
   {
     id: "game2",
     gameKey: "cannon",
-    title: "Cannon Baron",
-    img: `${BASE}/thumbs/jpcannons.png`,
+    title: "Big Cannons: Boardroom Escape",
+    img: `${BASE}/thumbs/bigcannons.png`,
     live: true,
   },
   {
